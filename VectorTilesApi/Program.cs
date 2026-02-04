@@ -37,8 +37,8 @@ builder.Services.AddCors(options =>
     {
         policy.AllowAnyOrigin()
               .AllowAnyMethod()
-              .AllowAnyHeader()              
-              .SetIsOriginAllowed(hostName => true);
+              .AllowAnyHeader();
+              //.SetIsOriginAllowed(hostName => true);
     });
 });
 
@@ -47,7 +47,7 @@ var app = builder.Build();
 
 app.UseCors("AllowAll");
 
-app.UseAuthorization();
+//app.UseAuthorization();
 
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
