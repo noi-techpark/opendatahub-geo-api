@@ -37,6 +37,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
     <script>
         // IMPORTANT: Change 'locations' to match your actual table name!
         const TABLE_NAME = 'announcements';  
+        const API_URL = 'http://localhost:5023';
         
         const map = new maplibregl.Map({
             container: 'map',
@@ -51,7 +52,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
                     },
                     'vector-tiles': {
                         type: 'vector',
-                        tiles: [`http://localhost:5023/api/tiles/${TABLE_NAME}/{z}/{x}/{y}.pbf`],
+                        tiles: [`${API_URL}/api/tiles/${TABLE_NAME}/{z}/{x}/{y}.pbf`],
                         minzoom: 0,
                         maxzoom: 22
                     }
@@ -111,7 +112,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
         map.on('load', () => {
             console.log('✅ Map loaded');
             console.log('📊 Table name:', TABLE_NAME);
-            console.log('🔗 Tile URL:', `http://localhost:5023/api/tiles/${TABLE_NAME}/{z}/{x}/{y}.pbf`);
+            console.log('🔗 Tile URL:', `${API_URL}/api/tiles/${TABLE_NAME}/{z}/{x}/{y}.pbf`);
             updateInfo();
         });
 

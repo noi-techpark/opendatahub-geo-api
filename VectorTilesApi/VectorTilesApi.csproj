@@ -11,7 +11,7 @@
   <ItemGroup>        
     <PackageReference Include="Npgsql" Version="10.0.1" />
     <PackageReference Include="SqlKata" Version="4.0.1" />
-    <PackageReference Include="SqlKata.Execution" Version="3.0.0" />
+    <PackageReference Include="SqlKata.Execution" Version="3.2.3" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.1" />
     <PackageReference Include="DotNetEnv" Version="3.1.1" />
   </ItemGroup>

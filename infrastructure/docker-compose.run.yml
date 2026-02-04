@@ -1,0 +1,10 @@
+services:
+  api:
+    image: ${DOCKER_IMAGE}:${DOCKER_TAG}
+    environment:
+      ASPNETCORE_URLS: http://+:80
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT}
+      ASPNETCORE_ConnectionStrings__PgConnection: ${PG_CONNECTION}    
+    restart: unless-stopped
+    ports:
+      - "${SERVER_PORT}:80"

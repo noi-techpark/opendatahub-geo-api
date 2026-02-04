@@ -80,6 +80,16 @@ dotnet run
 
 The API will start at `http://localhost:5023` (or `https://localhost:5023`).
 
+### 5. Run with Docker
+
+```bash
+cd VectorTilesApi
+docker compose build
+docker compose up -d
+```
+
+The API will start at `http://localhost:5023`.
+
 ## Usage
 
 ### API Endpoints
@@ -105,77 +115,25 @@ http://localhost:5000/api/tiles/your_table/14/2621/6333.pbf
 GET /api/tiles/health
 ```
 
-### Testing with MapLibre/Mapbox
+### Testing with MapLibre/Mapbox html
 
-```html
-
-
-
-    
-    Vector Tiles Test
-    
-    
-    
-    
-        body { margin: 0; padding: 0; }
-        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
-    
-
-
-    
-    
-        const map = new maplibregl.Map({
-            container: 'map',
-            style: {
-                version: 8,
-                sources: {
-                    'osm': {
-                        type: 'raster',
-                        tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-                        tileSize: 256,
-                        attribution: '© OpenStreetMap contributors'
-                    },
-                    'your-data': {
-                        type: 'vector',
-                        tiles: ['http://localhost:5000/api/tiles/your_table/{z}/{x}/{y}.pbf'],
-                        minzoom: 0,
-                        maxzoom: 22
-                    }
-                },
-                layers: [
-                    {
-                        id: 'osm-layer',
-                        type: 'raster',
-                        source: 'osm'
-                    },
-                    {
-                        id: 'your-layer',
-                        type: 'circle',
-                        source: 'your-data',
-                        'source-layer': 'your_table',
-                        paint: {
-                            'circle-radius': 6,
-                            'circle-color': '#ff0000'
-                        }
-                    }
-                ]
-            },
-            center: [-122.4194, 37.7749],
-            zoom: 12
-        });
-    
-
-
+```bash
+cd ..
+cd html
+serve -p PORT
 ```
+
+The Html file is available on the defined Port, "test-map.html"
+
 
 ### Testing with cURL
 
 ```bash
 # Get a vector tile
-curl -o tile.pbf http://localhost:5000/api/tiles/your_table/14/2621/6333.pbf
+curl -o tile.pbf http://localhost:5023/api/tiles/your_table/14/2621/6333.pbf
 
 # Check health
-curl http://localhost:5000/api/tiles/health
+curl http://localhost:5023/api/tiles/health
 ```
 
 ## Project Structure
