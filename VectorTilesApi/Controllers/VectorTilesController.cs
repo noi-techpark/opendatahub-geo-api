@@ -52,6 +52,8 @@ public class VectorTilesController : ControllerBase
     {
         try
         {
+            AddCorsHeaders();
+
             //Validate passed parameters
             var (isValid, errorMessage) = ValidateParamters(tableName, z, x, y, source, jsonselector, geocolumn);
             if (!isValid)
@@ -168,5 +170,14 @@ public class VectorTilesController : ControllerBase
     public IActionResult Health()
     {
         return Ok(new { status = "healthy", timestamp = DateTime.UtcNow });
+    }
+
+        // Helper method to add CORS headers explicitly
+    private void AddCorsHeaders()
+    {
+        Response.Headers.Append("Access-Control-Allow-Origin", "*");
+        Response.Headers.Append("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+        Response.Headers.Append("Access-Control-Allow-Headers", "*");
+        Response.Headers.Append("Access-Control-Max-Age", "86400");
     }
 }
