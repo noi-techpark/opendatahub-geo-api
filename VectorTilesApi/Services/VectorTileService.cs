@@ -21,8 +21,8 @@ public class VectorTileService : IVectorTileService
         : "";
         
         _logger = logger;
-        _logger.LogInformation("Database connection configured for host: {Host}", 
-            new Npgsql.NpgsqlConnectionStringBuilder(_connectionString).Host);
+        // _logger.LogInformation("Database connection configured for host: {Host}", 
+        //     new Npgsql.NpgsqlConnectionStringBuilder(_connectionString).Host);
     }
 
     public async Task<byte[]> GetVectorTileAsync(string tableName, int z, int x, int y, string? source, string? jsonselector, string geocolumn, List<string>? idlist)

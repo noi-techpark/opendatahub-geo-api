@@ -4,7 +4,7 @@ services:
     environment:
       ASPNETCORE_URLS: http://+:80
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT}
-      ASPNETCORE_ConnectionStrings__PgConnection: ${PG_CONNECTION}    
+      ASPNETCORE_PG_CONNECTION: ${PG_CONNECTION}    
     restart: unless-stopped
     ports:
       - "${SERVER_PORT}:80"
