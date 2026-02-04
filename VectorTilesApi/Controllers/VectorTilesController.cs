@@ -3,11 +3,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Cors;
 using OpenDataHubVectorTileApi.Services;
 
 namespace OpenDataHubVectorTileApi.Controllers;
 
 [ApiController]
+[EnableCors("AllowAll")]
 [Route("api/tiles")]
 public class VectorTilesController : ControllerBase
 {
