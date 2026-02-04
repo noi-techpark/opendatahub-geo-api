@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: NOI Techpark <digital@noi.bz.it>
+#
+# SPDX-License-Identifier: CC0-1.0
+
+services:
+  api:
+    image: ${DOCKER_IMAGE:-odh-geo-api}:${DOCKER_TAG:-latest}
+    build:
+      context: ../
+      dockerfile: VectorTilesApi/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:80
+      ASPNETCORE_ConnectionStrings__PgConnection: ${PG_CONNECTION}      
+    ports:
+      - "5023:80"
