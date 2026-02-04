@@ -1,0 +1,24 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VectorTilesApi", "VectorTilesApi\VectorTilesApi.csproj", "{06F56040-F4DE-6184-9534-555EF971F18D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{06F56040-F4DE-6184-9534-555EF971F18D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{06F56040-F4DE-6184-9534-555EF971F18D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{06F56040-F4DE-6184-9534-555EF971F18D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{06F56040-F4DE-6184-9534-555EF971F18D}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {EEB02C9E-5A65-4851-8609-9FDE2007B5AD}
+	EndGlobalSection
+EndGlobal
