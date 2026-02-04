@@ -16,14 +16,16 @@ public class VectorTileService : IVectorTileService
     public VectorTileService(IConfiguration configuration, ILogger<VectorTileService> logger)
     {
         // Try to get full connection string first
-        _connectionString = configuration["PG_CONNECTION"];
+        _connectionString = configuration != null && !String.IsNullOrEmpty(configuration["PG_CONNECTION"]) 
+        ? configuration["PG_CONNECTION"]! 
+        : "";
         
         _logger = logger;
         _logger.LogInformation("Database connection configured for host: {Host}", 
             new Npgsql.NpgsqlConnectionStringBuilder(_connectionString).Host);
     }
 
-    public async Task<byte[]> GetVectorTileAsync(string tableName, int z, int x, int y)
+    public async Task<byte[]> GetVectorTileAsync(string tableName, int z, int x, int y, string? source, string? jsonselector, string geocolumn, List<string>? idlist)
     {
         try
         {
@@ -33,15 +35,37 @@ public class VectorTileService : IVectorTileService
             // Calculate tile bounds using Web Mercator projection (EPSG:3857)
             var (xmin, ymin, xmax, ymax) = TileToBounds(x, y, z);
 
+            var sourcequery = source != null 
+                            ? $@" AND gen_source = @source"
+                            : "";
+
+            var idlistquery = idlist != null 
+                            ? $@" AND WHERE id = ANY(@ids)"
+                            : "";
+
+            var jsonselectorquery = "data#>>'{Shortname}' as data";
+
+            if(jsonselector != null)
+            {
+                jsonselectorquery = "";
+                var jsonselectorfields = jsonselector.Split(",");
+                foreach(var jsonselectorfield in jsonselectorfields)
+                {
+                    var jsonselectparsed = jsonselectorfield.Replace(".",",");
+                    jsonselectorquery = jsonselectorquery + $@"data#>>'{jsonselectparsed}' as data.{jsonselectparsed}";
+                }
+
+            }
+
             // Build the query using raw SQL with ST_AsMVT
             // Note: SqlKata doesn't directly support PostGIS functions, so we use raw SQL
             var query = $@"
                 WITH mvtgeom AS (
                     SELECT
                         id,
-                        data,
+                        {jsonselectorquery},
                         ST_AsMVTGeom(
-                            ST_Transform(geo, 3857),
+                            ST_Transform({geocolumn}, 3857),
                             ST_MakeEnvelope(@xmin, @ymin, @xmax, @ymax, 3857),
                             4096,
                             256,
@@ -49,12 +73,12 @@ public class VectorTileService : IVectorTileService
                         ) AS geom
                     FROM {tableName}
                     WHERE ST_Intersects(
-                        geo,
+                        {geocolumn},
                         ST_Transform(
                             ST_MakeEnvelope(@xmin, @ymin, @xmax, @ymax, 3857),
-                            ST_SRID(geo)
+                            ST_SRID({geocolumn})
                         )
-                    )
+                    ){sourcequery}{idlistquery}
                 )
                 SELECT ST_AsMVT(mvtgeom.*, '{tableName}', 4096, 'geom')
                 FROM mvtgeom
@@ -66,6 +90,12 @@ public class VectorTileService : IVectorTileService
             cmd.Parameters.AddWithValue("@ymin", ymin);
             cmd.Parameters.AddWithValue("@xmax", xmax);
             cmd.Parameters.AddWithValue("@ymax", ymax);
+            if(source != null)
+                cmd.Parameters.AddWithValue("@source", source);
+            if(idlist != null)
+                cmd.Parameters.AddWithValue("ids", idlist.ToArray());
+    
+
             var result = await cmd.ExecuteScalarAsync();
 
             if (result == null || result == DBNull.Value)

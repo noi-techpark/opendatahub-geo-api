@@ -26,7 +26,7 @@ public class AdvancedVectorTileService : IVectorTileService
         _compiler = new PostgresCompiler();
     }
 
-    public async Task<byte[]> GetVectorTileAsync(string tableName, int z, int x, int y)
+    public async Task<byte[]> GetVectorTileAsync(string tableName, int z, int x, int y, string? source, string? jsonselector, string geocolumn, List<string>? idlist)
     {
         try
         {
