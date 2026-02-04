@@ -25,7 +25,7 @@ public class VectorTileService : IVectorTileService
             new Npgsql.NpgsqlConnectionStringBuilder(_connectionString).Host);
     }
 
-    public async Task<byte[]> GetVectorTileAsync(string tableName, int z, int x, int y, string? source, string? jsonselector, string geocolumn, List<string>? idlist)
+    public async Task<byte[]> GetVectorTileAsync(string tableName, string type, int z, int x, int y, string? source, string? jsonselector, string geocolumn, List<string>? idlist)
     {
         try
         {
@@ -45,16 +45,27 @@ public class VectorTileService : IVectorTileService
 
             var jsonselectorquery = "data#>>'{Shortname}' as data";
 
-            if(jsonselector != null)
+            var additionalwhereclause = " AND gen_access_role @> Array['ANONYMOUS']";
+
+            if (jsonselector != null)
             {
                 jsonselectorquery = "";
                 var jsonselectorfields = jsonselector.Split(",");
-                foreach(var jsonselectorfield in jsonselectorfields)
+                foreach (var jsonselectorfield in jsonselectorfields)
                 {
-                    var jsonselectparsed = jsonselectorfield.Replace(".",",");
+                    var jsonselectparsed = jsonselectorfield.Replace(".", ",");
                     jsonselectorquery = jsonselectorquery + $@"data#>>'{jsonselectparsed}' as data.{jsonselectparsed}";
                 }
-
+            }
+            
+              //Special Case geoshape
+            if(tableName == "geoshapes")
+            {
+                jsonselectorquery = "name";
+                sourcequery = source != null 
+                            ? $@" AND source = @source"
+                            : "";
+                additionalwhereclause = "";
             }
 
             // Build the query using raw SQL with ST_AsMVT
@@ -72,18 +83,21 @@ public class VectorTileService : IVectorTileService
                             true
                         ) AS geom
                     FROM {tableName}
-                    WHERE ST_Intersects(
-                        {geocolumn},
-                        ST_Transform(
-                            ST_MakeEnvelope(@xmin, @ymin, @xmax, @ymax, 3857),
-                            ST_SRID({geocolumn})
-                        )
-                    ){sourcequery}{idlistquery}
+                     WHERE ST_Intersects(
+                         ST_Transform({geocolumn}, 3857),
+                         ST_MakeEnvelope(@xmin, @ymin, @xmax, @ymax, 3857)
+                     ){sourcequery}{idlistquery}{additionalwhereclause}
                 )
-                SELECT ST_AsMVT(mvtgeom.*, '{tableName}', 4096, 'geom')
+                SELECT ST_AsMVT(mvtgeom.*, '{type}', 4096, 'geom')
                 FROM mvtgeom
                 WHERE geom IS NOT NULL;
             ";
+
+            
+            // WHERE ST_Intersects(
+            //             ST_Transform({geocolumn}, 3857),
+            //             ST_MakeEnvelope(@xmin, @ymin, @xmax, @ymax, 3857)
+            //         )
 
             await using var cmd = new NpgsqlCommand(query, connection);
             cmd.Parameters.AddWithValue("@xmin", xmin);

@@ -16,7 +16,7 @@ public class VectorTilesController : ControllerBase
     private readonly IVectorTileService _vectorTileService;
     private readonly ILogger<VectorTilesController> _logger;
 
-    private List<string> _allowedTableNames;
+    //private List<string> _allowedTableNames;
     private List<string> _allowedGeoColumns;
     private List<string> _allowedJsonSelectors;
 
@@ -24,7 +24,7 @@ public class VectorTilesController : ControllerBase
     {
         _vectorTileService = vectorTileService;
         _logger = logger;
-        _allowedTableNames = new List<string>(){"announcements","accommodations","smgpois","geodata"};
+        //_allowedTableNames = new List<string>(){"announcements","accommodations","smgpois","geodatas"};
         _allowedGeoColumns = new List<string>(){"geo","gen_position","geometry"};
         _allowedJsonSelectors = new List<string>(){"Shortname","Source","Active","Detail.de.Title"};
     }
@@ -52,14 +52,12 @@ public class VectorTilesController : ControllerBase
     {
         try
         {
-            AddCorsHeaders();
-
             //Validate passed parameters
             var (isValid, errorMessage) = ValidateParamters(tableName, z, x, y, source, jsonselector, geocolumn);
             if (!isValid)
                 return BadRequest(errorMessage);            
 
-            var tile = await _vectorTileService.GetVectorTileAsync(tableName, z, x, y, source, jsonselector, geocolumn, null);
+            var tile = await _vectorTileService.GetVectorTileAsync(TranslateTypeString2Table(tableName), tableName, z, x, y, source, jsonselector, geocolumn, null);
 
             if (tile == null || tile.Length == 0)
             {
@@ -108,7 +106,7 @@ public class VectorTilesController : ControllerBase
             if (!isValid)
                 return BadRequest(errorMessage);            
 
-            var tile = await _vectorTileService.GetVectorTileAsync(tableName, z, x, y, source, jsonselector, geocolumn, idlist);
+            var tile = await _vectorTileService.GetVectorTileAsync(TranslateTypeString2Table(tableName), tableName, z, x, y, source, jsonselector, geocolumn, idlist);
 
             if (tile == null || tile.Length == 0)
             {
@@ -150,8 +148,7 @@ public class VectorTilesController : ControllerBase
                 return (false, "Invalid zoom level");
             }
 
-            if(!_allowedTableNames.Contains(tableName))
-                return (false, "Invalid table name");
+            TranslateTypeString2Table(tableName);
             
             if(geocolumn != null && !_allowedGeoColumns.Contains(geocolumn))
                 return (false, "Invalid geo column");
@@ -172,12 +169,59 @@ public class VectorTilesController : ControllerBase
         return Ok(new { status = "healthy", timestamp = DateTime.UtcNow });
     }
 
-        // Helper method to add CORS headers explicitly
-    private void AddCorsHeaders()
+/// <summary>
+/// Translates Type (Metadata) as String to PG Table Name
+/// </summary>
+/// <param name="odhtype"></param>
+/// <returns></returns>
+public static string TranslateTypeString2Table(string odhtype)
+{
+    return odhtype switch
     {
-        Response.Headers.Append("Access-Control-Allow-Origin", "*");
-        Response.Headers.Append("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-        Response.Headers.Append("Access-Control-Allow-Headers", "*");
-        Response.Headers.Append("Access-Control-Max-Age", "86400");
-    }
+        "accommodation" => "accommodations",
+        "accommodationroom" => "accommodationrooms",
+        "ltsactivity" => "activities",
+        "ltspoi" => "pois",
+        //"ltsgastronomy" => "gastronomies",
+        "event" => "events",
+        "odhactivitypoi" => "smgpois",
+        "package" => "packages",
+        "measuringpoint" => "measuringpoints",
+        "webcam" => "webcams",
+        "article" => "articles",
+        "venue" => "venues_v2",
+        "eventshort" => "eventeuracnoi",
+        "experiencearea" => "experienceareas",
+        "metaregion" => "metaregions",
+        "region" => "regions",
+        "tourismassociation" => "tvs",
+        "municipality" => "municipalities",
+        "district" => "districts",
+        "skiarea" => "skiareas",
+        "skiregion" => "skiregions",
+        "area" => "areas",
+        "wineaward" => "wines",
+        "odhtag" => "smgtags",
+        "publisher" => "publishers",
+        "source" => "sources",
+        "weatherhistory" => "weatherdatahistory",
+        "odhmetadata" => "metadata",
+        "tag" => "tags",
+        "geoshape" => "geoshapes",
+        "announcement" => "announcements",
+        "urbangreen" => "urbangreens",
+        _ => throw new Exception("not known type"),
+    };
+}
+
+     
+
+    // Helper method to add CORS headers explicitly
+    // private void AddCorsHeaders()
+    // {
+    //     Response.Headers.Append("Access-Control-Allow-Origin", "*");
+    //     Response.Headers.Append("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    //     Response.Headers.Append("Access-Control-Allow-Headers", "*");
+    //     Response.Headers.Append("Access-Control-Max-Age", "86400");
+    // }
 }
