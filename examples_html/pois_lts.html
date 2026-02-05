@@ -29,6 +29,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
     </style>
 </head>
 <body>
+    <h1>Activities & Pois with Source LTS</h1>
     <div class="debug">
         <strong>🔍 Debug Info</strong><br>
         <div id="info">Loading...</div>
@@ -36,9 +37,10 @@ SPDX-License-Identifier: AGPL-3.0-or-later
     <div id="map"></div>
     <script>
         // IMPORTANT: Change 'locations' to match your actual table name!
-        const TABLE_NAME = 'announcement';          
-        const API_URL = 'http://localhost:5023';
-        
+        const TABLE_NAME = 'odhactivitypoi';  
+        const API_URL = 'https://geo.api.opendatahub.testingmachine.eu';
+        const ADDITIONAL = '?source=lts&geocolumn=gen_position'
+		
         const map = new maplibregl.Map({
             container: 'map',
             style: {
@@ -52,7 +54,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
                     },
                     'vector-tiles': {
                         type: 'vector',
-                        tiles: [`${API_URL}/api/tiles/${TABLE_NAME}/{z}/{x}/{y}.pbf`],
+                        tiles: [`${API_URL}/api/tiles/${TABLE_NAME}/{z}/{x}/{y}.pbf${ADDITIONAL}`],
                         minzoom: 0,
                         maxzoom: 22
                     }

@@ -1,0 +1,53 @@
+<!--
+SPDX-FileCopyrightText: NOI Techpark <digital@noi.bz.it>
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>South Tyrol Vector Tiles</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js'></script>
+    <link href='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css' rel='stylesheet' />
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+        .debug {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 11px;
+            max-width: 300px;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="debug">
+        <strong>🔍 Debug Info</strong><br>
+        <div id="info">Loading...</div>
+    </div>
+    <div id="map"></div>
+    
+    <!-- Include the reusable library -->
+    <script src="vector-tile-map.js"></script>
+    
+    <!-- Initialize with your config -->
+    <script>
+        const myMap = new VectorTileMap({
+            containerId: 'map',
+            tableName: 'geoshape',
+            apiUrl: 'https://geo.api.opendatahub.testingmachine.eu',
+            additional: '?geocolumn=geometry&source=dservices3.arcgis.com',
+            center: [11.35, 46.5],
+            zoom: 10
+        });
+    </script>
+</body>
+</html>

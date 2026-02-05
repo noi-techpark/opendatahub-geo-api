@@ -1,0 +1,274 @@
+<!--
+SPDX-FileCopyrightText: NOI Techpark <digital@noi.bz.it>
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>South Tyrol Vector Tiles</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js'></script>
+    <link href='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css' rel='stylesheet' />
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+        .debug {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 11px;
+            max-width: 300px;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="debug">
+        <strong>🔍 Debug Info</strong><br>
+        <div id="info">Loading...</div>
+    </div>
+    <div id="map"></div>
+    <script>
+        
+		const TABLE_NAME = 'geoshape';  
+        const API_URL = 'https://geo.api.opendatahub.testingmachine.eu';
+        const ADDITIONAL = '?geocolumn=geometry&source=dservices3.arcgis.com'
+		
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: {
+                version: 8,
+                sources: {
+                    'osm': {
+                        type: 'raster',
+                        tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                        tileSize: 256,
+                        attribution: '© OpenStreetMap'
+                    },
+                    'vector-tiles': {
+                        type: 'vector',
+                        tiles: [`${API_URL}/api/tiles/${TABLE_NAME}/{z}/{x}/{y}.pbf${ADDITIONAL}`],
+                        minzoom: 0,
+                        maxzoom: 22
+                    }
+                },
+                layers: [
+                    {
+                        id: 'osm-background',
+                        type: 'raster',
+                        source: 'osm',
+                        minzoom: 0,
+                        maxzoom: 22
+                    },
+					{
+						id: 'polygons',
+						type: 'fill',
+						source: 'vector-tiles',
+						'source-layer': TABLE_NAME,
+						filter: ['any',
+							['==', ['geometry-type'], 'Polygon'],
+							['==', ['geometry-type'], 'MultiPolygon']
+						],
+						paint: {
+							'fill-color': '#0080FF',
+							'fill-opacity': 0.4,
+							'fill-outline-color': '#004080'
+						}
+					},
+                    {
+                        id: 'lines',
+                        type: 'line',
+                        source: 'vector-tiles',
+                        'source-layer': TABLE_NAME,
+                        filter: ['any',
+                            ['==', ['geometry-type'], 'LineString'],
+                            ['==', ['geometry-type'], 'MultiLineString']
+                        ],
+                        paint: {
+                            'line-color': '#404040',
+                            'line-width': [
+                                'interpolate', ['linear'], ['zoom'],
+                                8, 1,
+                                12, 2,
+                                16, 4,
+                                20, 6
+                            ],
+                            'line-opacity': 0.8
+                        },
+                        layout: {
+                            'line-cap': 'round',
+                            'line-join': 'round'
+                        }
+                    },
+                    {
+                        id: 'points',
+                        type: 'circle',
+                        source: 'vector-tiles',
+                        'source-layer': TABLE_NAME,  // ← This MUST match your table name!
+						filter: ['==', ['geometry-type'], 'Point'],
+                        paint: {
+                            'circle-radius': [
+                                'interpolate', ['linear'], ['zoom'],
+                                0, 2,
+                                10, 5,
+                                14, 10,
+                                18, 15
+                            ],
+                            'circle-color': '#FF0000',
+                            'circle-stroke-width': 2,
+                            'circle-stroke-color': '#FFFFFF',
+                            'circle-opacity': 0.8
+                        }
+                    }
+                ]
+            },
+            center: [11.35, 46.5],  // Bolzano
+            zoom: 10
+        });
+
+        // Add controls
+        map.addControl(new maplibregl.NavigationControl());
+        map.addControl(new maplibregl.ScaleControl());
+
+        // Debug info
+        function updateInfo() {
+            const center = map.getCenter();
+            const zoom = map.getZoom();
+            const features = map.queryRenderedFeatures({ layers: ['polygons','points'] });
+            
+            document.getElementById('info').innerHTML = `
+                <strong>Zoom:</strong> ${zoom.toFixed(2)}<br>
+                <strong>Center:</strong> ${center.lat.toFixed(4)}°N, ${center.lng.toFixed(4)}°E<br>
+                <strong>Table:</strong> ${TABLE_NAME}<br>
+                <strong>Visible features:</strong> ${features.length}<br>
+                <strong>Source-layer:</strong> ${TABLE_NAME}
+            `;
+        }
+
+        map.on('load', () => {
+            console.log('✅ Map loaded');
+            console.log('📊 Table name:', TABLE_NAME);
+            console.log('🔗 Tile URL:', `${API_URL}/api/tiles/${TABLE_NAME}/{z}/{x}/{y}.pbf`);
+			console.log(
+			  map.getStyle().sources['vector-tiles']
+			);
+			console.log(map.queryRenderedFeatures({ layers: ['polygons'] }));
+            console.log('Lines:', map.queryRenderedFeatures({ layers: ['lines'] }).length);
+            console.log('Points:', map.queryRenderedFeatures({ layers: ['points'] }).length);     
+            updateInfo();
+        });
+
+        map.on('moveend', updateInfo);
+        map.on('zoomend', updateInfo);
+
+        // Log tile loads
+        map.on('data', (e) => {
+            if (e.sourceId === 'vector-tiles' && e.tile) {
+                console.log('📦 Tile loaded:', e.tile.tileID);
+                updateInfo();
+            }
+        });
+
+        // Log errors
+        map.on('error', (e) => {
+            console.error('❌ Error:', e);
+            if (e.error) {
+                document.getElementById('info').innerHTML += `<br><span style="color:red;">Error: ${e.error.message}</span>`;
+            }
+        });
+
+        // Click handlers for polygons
+        map.on('click', 'polygons', (e) => {
+            const feature = e.features[0];
+            console.log('🎯 Clicked polygon:', feature);
+            
+            const props = feature.properties;
+            let html = `<strong>Polygon Feature</strong><br>`;
+            html += `<strong>ID:</strong> ${props.id}<br>`;
+            
+            if (props.data) {
+                try {
+                    const data = JSON.parse(props.data);
+                    Object.keys(data).forEach(key => {
+                        html += `<strong>${key}:</strong> ${data[key]}<br>`;
+                    });
+                } catch (e) {
+                    html += `<strong>Data:</strong> ${props.data}<br>`;
+                }
+            }
+            
+            new maplibregl.Popup()
+                .setLngLat(e.lngLat)
+                .setHTML(html)
+                .addTo(map);
+        });
+
+        // Click handlers for lines
+        map.on('click', 'lines', (e) => {
+            const feature = e.features[0];
+            console.log('🎯 Clicked line:', feature);
+            
+            const props = feature.properties;
+            let html = `<strong>Line Feature</strong><br>`;
+            html += `<strong>ID:</strong> ${props.id}<br>`;
+            html += `<strong>Type:</strong> ${feature.geometry.type}<br>`;
+            
+            if (props.data) {
+                try {
+                    const data = JSON.parse(props.data);
+                    Object.keys(data).forEach(key => {
+                        html += `<strong>${key}:</strong> ${data[key]}<br>`;
+                    });
+                } catch (e) {
+                    html += `<strong>Data:</strong> ${props.data}<br>`;
+                }
+            }
+            
+            new maplibregl.Popup()
+                .setLngLat(e.lngLat)
+                .setHTML(html)
+                .addTo(map);
+        });
+            
+    // Change cursor on hover for points
+        map.on('mouseenter', 'points', () => {
+            map.getCanvas().style.cursor = 'pointer';
+        });
+
+        map.on('mouseleave', 'points', () => {
+            map.getCanvas().style.cursor = '';
+        });
+
+        // Change cursor on hover for polygons
+        map.on('mouseenter', 'polygons', () => {
+            map.getCanvas().style.cursor = 'pointer';
+        });
+
+        map.on('mouseleave', 'polygons', () => {
+            map.getCanvas().style.cursor = '';
+        });
+
+        // Change cursor on hover for lines
+        map.on('mouseenter', 'lines', () => {
+            map.getCanvas().style.cursor = 'pointer';
+        });
+
+        map.on('mouseleave', 'lines', () => {
+            map.getCanvas().style.cursor = '';
+        });
+
+        // Click anywhere to check features
+        map.on('click', (e) => {
+            const features = map.queryRenderedFeatures(e.point);
+            console.log('🖱️ All features at click:', features);
+            console.log('🎯 Vector features:', features.filter(f => f.source === 'vector-tiles'));
+        });
+    </script>
+</body>
+</html>

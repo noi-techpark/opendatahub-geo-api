@@ -35,10 +35,10 @@ SPDX-License-Identifier: AGPL-3.0-or-later
     </div>
     <div id="map"></div>
     <script>
-        // IMPORTANT: Change 'locations' to match your actual table name!
-        const TABLE_NAME = 'odhactivitypoi';  
-        const API_URL = 'http://localhost:5023';
-        const ADDITIONAL = '?source=lts&geocolumn=gen_position'
+        
+		const TABLE_NAME = 'geoshape';  
+        const API_URL = 'https://geo.api.opendatahub.testingmachine.eu';
+        const ADDITIONAL = '?geocolumn=geometry&source=istat'
 		
         const map = new maplibregl.Map({
             container: 'map',
@@ -66,11 +66,27 @@ SPDX-License-Identifier: AGPL-3.0-or-later
                         minzoom: 0,
                         maxzoom: 22
                     },
+					{
+						id: 'polygons',
+						type: 'fill',
+						source: 'vector-tiles',
+						'source-layer': TABLE_NAME,
+						filter: ['any',
+							['==', ['geometry-type'], 'Polygon'],
+							['==', ['geometry-type'], 'MultiPolygon']
+						],
+						paint: {
+							'fill-color': '#0080FF',
+							'fill-opacity': 0.4,
+							'fill-outline-color': '#004080'
+						}
+					},
                     {
                         id: 'points',
                         type: 'circle',
                         source: 'vector-tiles',
                         'source-layer': TABLE_NAME,  // ← This MUST match your table name!
+						filter: ['==', ['geometry-type'], 'Point'],
                         paint: {
                             'circle-radius': [
                                 'interpolate', ['linear'], ['zoom'],
@@ -99,7 +115,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
         function updateInfo() {
             const center = map.getCenter();
             const zoom = map.getZoom();
-            const features = map.queryRenderedFeatures({ layers: ['points'] });
+            const features = map.queryRenderedFeatures({ layers: ['polygons','points'] });
             
             document.getElementById('info').innerHTML = `
                 <strong>Zoom:</strong> ${zoom.toFixed(2)}<br>
@@ -114,6 +130,10 @@ SPDX-License-Identifier: AGPL-3.0-or-later
             console.log('✅ Map loaded');
             console.log('📊 Table name:', TABLE_NAME);
             console.log('🔗 Tile URL:', `${API_URL}/api/tiles/${TABLE_NAME}/{z}/{x}/{y}.pbf`);
+			console.log(
+			  map.getStyle().sources['vector-tiles']
+			);
+			console.log(map.queryRenderedFeatures({ layers: ['polygons'] }));
             updateInfo();
         });
 
@@ -161,6 +181,15 @@ SPDX-License-Identifier: AGPL-3.0-or-later
                 .setHTML(html)
                 .addTo(map);
         });
+		
+		map.on('click', 'polygons', (e) => {
+			const f = e.features[0];
+			new maplibregl.Popup()
+				.setLngLat(e.lngLat)
+				.setHTML(`<strong>Polygon ID:</strong> ${f.properties.id}`)
+				.addTo(map);
+		});
+		
 
         // Change cursor on hover
         map.on('mouseenter', 'points', () => {
