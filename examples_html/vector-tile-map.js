@@ -5,7 +5,7 @@
  * VectorTileMap - Reusable vector tile map component
  * @param {Object} config - Configuration object
  * @param {string} config.containerId - ID of the map container element
- * @param {string} config.tableName - Name of the database table
+ * @param {string} config.type - Name of the open data hub type
  * @param {string} config.apiUrl - Base URL of the vector tile API
  * @param {string} config.additional - Additional query parameters (optional)
  * @param {Array} config.center - Map center [longitude, latitude]
@@ -15,7 +15,7 @@
 function VectorTileMap(config) {
     const {
         containerId = 'map',
-        tableName,
+        type,
         apiUrl,
         additional = '',
         center = [11.35, 46.5],
@@ -23,8 +23,8 @@ function VectorTileMap(config) {
         styles = {}
     } = config;
 
-    if (!tableName || !apiUrl) {
-        throw new Error('tableName and apiUrl are required');
+    if (!type || !apiUrl) {
+        throw new Error('type and apiUrl are required');
     }
 
     // Default styles
@@ -80,7 +80,7 @@ function VectorTileMap(config) {
                 },
                 'vector-tiles': {
                     type: 'vector',
-                    tiles: [`${apiUrl}/api/tiles/${tableName}/{z}/{x}/{y}.pbf${additional}`],
+                    tiles: [`${apiUrl}/api/tiles/${type}/{z}/{x}/{y}.pbf${additional}`],
                     minzoom: 0,
                     maxzoom: 22
                 }
@@ -97,7 +97,7 @@ function VectorTileMap(config) {
                     id: 'polygons',
                     type: 'fill',
                     source: 'vector-tiles',
-                    'source-layer': tableName,
+                    'source-layer': type,
                     filter: ['any',
                         ['==', ['geometry-type'], 'Polygon'],
                         ['==', ['geometry-type'], 'MultiPolygon']
@@ -108,7 +108,7 @@ function VectorTileMap(config) {
                     id: 'lines',
                     type: 'line',
                     source: 'vector-tiles',
-                    'source-layer': tableName,
+                    'source-layer': type,
                     filter: ['any',
                         ['==', ['geometry-type'], 'LineString'],
                         ['==', ['geometry-type'], 'MultiLineString']
@@ -123,7 +123,7 @@ function VectorTileMap(config) {
                     id: 'points',
                     type: 'circle',
                     source: 'vector-tiles',
-                    'source-layer': tableName,
+                    'source-layer': type,
                     filter: ['==', ['geometry-type'], 'Point'],
                     paint: mergedStyles.points
                 }
@@ -148,9 +148,9 @@ function VectorTileMap(config) {
             infoElement.innerHTML = `
                 <strong>Zoom:</strong> ${zoom.toFixed(2)}<br>
                 <strong>Center:</strong> ${center.lat.toFixed(4)}°N, ${center.lng.toFixed(4)}°E<br>
-                <strong>Table:</strong> ${tableName}<br>
+                <strong>Table:</strong> ${type}<br>
                 <strong>Visible features:</strong> ${features.length}<br>
-                <strong>Source-layer:</strong> ${tableName}
+                <strong>Source-layer:</strong> ${type}
             `;
         }
     }
@@ -158,8 +158,8 @@ function VectorTileMap(config) {
     // Event handlers
     map.on('load', () => {
         console.log('✅ Map loaded');
-        console.log('📊 Table name:', tableName);
-        console.log('🔗 Tile URL:', `${apiUrl}/api/tiles/${tableName}/{z}/{x}/{y}.pbf${additional}`);
+        console.log('📊 Table name:', type);
+        console.log('🔗 Tile URL:', `${apiUrl}/api/tiles/${type}/{z}/{x}/{y}.pbf${additional}`);
         console.log('Polygons:', map.queryRenderedFeatures({ layers: ['polygons'] }).length);
         console.log('Lines:', map.queryRenderedFeatures({ layers: ['lines'] }).length);
         console.log('Points:', map.queryRenderedFeatures({ layers: ['points'] }).length);

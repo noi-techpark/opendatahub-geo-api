@@ -7,7 +7,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 <html>
 <head>
     <meta charset="utf-8">
-    <title>South Tyrol Vector Tiles</title>
+    <title>South Tyrol Wineries</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js'></script>
     <link href='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css' rel='stylesheet' />
@@ -29,22 +29,22 @@ SPDX-License-Identifier: AGPL-3.0-or-later
     </style>
 </head>
 <body>
+    <h1>Activities & Pois with Source suedtirolwein</h1>
     <div class="debug">
         <strong>🔍 Debug Info</strong><br>
         <div id="info">Loading...</div>
     </div>
     <div id="map"></div>
-    
-    <!-- Include the reusable library -->
+        <!-- Include the reusable library -->
     <script src="vector-tile-map.js"></script>
     
     <!-- Initialize with your config -->
     <script>
         const myMap = new VectorTileMap({
             containerId: 'map',
-            tableName: 'geoshape',
+            type: 'odhactivitypoi',
             apiUrl: 'https://geo.api.opendatahub.testingmachine.eu',
-            additional: '?geocolumn=geometry&source=dservices3.arcgis.com',
+            additional: '?source=suedtirolwein',
             center: [11.35, 46.5],
             zoom: 10
         });

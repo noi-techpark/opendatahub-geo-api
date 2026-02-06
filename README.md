@@ -135,21 +135,6 @@ curl -o tile.pbf http://localhost:5023/api/tiles/your_table/14/2621/6333.pbf
 # Check health
 curl http://localhost:5023/api/tiles/health
 ```
-
-## Project Structure
-
-```
-VectorTileApi/
-├── Controllers/
-│   └── VectorTilesController.cs    # API endpoints
-├── Services/
-│   ├── IVectorTileService.cs       # Service interface
-│   └── VectorTileService.cs        # ST_AsMVT implementation
-├── Program.cs                       # Application setup
-├── appsettings.json                 # Configuration
-└── VectorTileApi.csproj            # Project file
-```
-
 ## How It Works
 
 1. **Tile Coordinates**: The API receives tile coordinates (z, x, y) in the Web Mercator projection
@@ -168,6 +153,29 @@ VectorTileApi/
 - ✅ CORS enabled for web clients
 - ✅ Swagger documentation
 
+## How to use the api in a web application
+
+Visit the `examples_html` section.
+There are various maps with data from Open Data Hub Content Api.
+
+Simply include the `vector-tile-map.js` in a html file  
+`<script src="vector-tile-map.js"></script>`
+initialize with config    
+
+```html
+    <!-- Initialize with your config -->
+    <script>
+        const myMap = new VectorTileMap({
+            containerId: 'map',
+            type: 'odhactivitypoi',
+            apiUrl: 'https://geo.api.opendatahub.testingmachine.eu',
+            additional: '?source=suedtirolwein',
+            center: [11.35, 46.5],
+            zoom: 10
+        });
+    </script>
+```
+
 ## Performance Tips
 
 1. **Create spatial indexes** on your geometry columns
@@ -182,11 +190,6 @@ VectorTileApi/
 - Check that your data intersects with the requested tile bounds
 - Verify the SRID of your geometries matches the query
 - Ensure PostGIS extension is installed: `SELECT postgis_version();`
-
-### Connection errors
-- Verify PostgreSQL connection string in appsettings.json
-- Check PostgreSQL is running and accessible
-- Confirm database user has SELECT permissions
 
 ### Performance issues
 - Add spatial index: `CREATE INDEX idx_geo ON your_table USING GIST(geo);`
