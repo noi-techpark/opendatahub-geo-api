@@ -224,6 +224,8 @@ public class VectorTilesController : ControllerBase
             "geoshape" => "geometry",
             "geodata" => "geo",
             "announcement" => "geo",
+            "urbangreen" => "geo",
+            "spatialdata" => "geo",
             _ => "gen_position",
         };
     }
