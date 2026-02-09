@@ -27,6 +27,8 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+builder.Services.AddResponseCompression();
+
 // Register the VectorTileService
 builder.Services.AddScoped<IVectorTileService, VectorTileService>();
 
