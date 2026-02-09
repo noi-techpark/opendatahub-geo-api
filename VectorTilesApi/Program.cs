@@ -46,7 +46,7 @@ var app = builder.Build();
 
 
 app.UseCors("AllowAll");
-
+app.UseResponseCompression();
 //app.UseAuthorization();
 
 // Configure the HTTP request pipeline
