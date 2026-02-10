@@ -43,7 +43,8 @@ public class VectorTileService : IVectorTileService
                             ? $@" AND WHERE id = ANY(@ids)"
                             : "";
 
-            var jsonselectorquery = "data#>>'{Shortname}' as data";
+            //var jsonselectorquery = "data#>>'{Shortname}' as data";
+            var jsonselectorquery = "gen_shortname as data";
 
             var additionalwhereclause = " AND gen_access_role @> Array['ANONYMOUS']";
 
@@ -58,13 +59,19 @@ public class VectorTileService : IVectorTileService
                 }
             }
             
-              //Special Case geoshape
+            //Special Case geoshape
             if(tableName == "geoshapes")
             {
                 jsonselectorquery = "name";
                 sourcequery = source != null 
                             ? $@" AND source = @source"
                             : "";
+                additionalwhereclause = "";
+            }
+
+            //Special Case spatialdata
+            if(tableName == "spatialdatas")
+            {                
                 additionalwhereclause = "";
             }
 
