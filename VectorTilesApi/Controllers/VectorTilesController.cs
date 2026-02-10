@@ -213,6 +213,7 @@ public class VectorTilesController : ControllerBase
             "geoshape" => "geoshapes",
             "announcement" => "announcements",
             "urbangreen" => "urbangreens",
+            "spatialdata" => "spatialdatas",
             _ => throw new Exception("not known type"),
         };
     }
