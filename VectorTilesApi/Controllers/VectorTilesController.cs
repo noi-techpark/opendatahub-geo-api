@@ -22,7 +22,7 @@ public class VectorTilesController : ControllerBase
     {
         _vectorTileService = vectorTileService;
         _logger = logger;
-        _allowedGeoColumns = new List<string>() { "geo", "gen_position", "geometry" };
+        _allowedGeoColumns = new List<string>() { "geo", "gen_position", "geometry", "gen_center_position" };
         _allowedJsonSelectors = new List<string>() { "Shortname", "Source", "Active", "Detail.de.Title" };
     }
 
@@ -219,7 +219,7 @@ public class VectorTilesController : ControllerBase
     }
 
     public static string TranslateTypeString2GeoColumn(string odhtype)
-        {
+    {
         return odhtype switch
         {
             "geoshape" => "geometry",
