@@ -7,7 +7,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 <html>
 <head>
     <meta charset="utf-8">
-    <title>South Tyrol Wineries</title>
+    <title>Digiway Geoshapes Euregio</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js'></script>
     <link href='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css' rel='stylesheet' />
@@ -36,14 +36,15 @@ SPDX-License-Identifier: AGPL-3.0-or-later
     </div>
     <div id="map"></div>
         <!-- Include the reusable library -->
-    <script src="../vector-tile-map.js"></script>
+    <script src="../js/vector-tile-map.js"></script>
+    <script src="../js/config.js"></script>
     
     <!-- Initialize with your config -->
     <script>
         const myMap = new VectorTileMap({
             containerId: 'map',
             type: 'spatialdata',
-            apiUrl: 'https://geo.api.opendatahub.testingmachine.eu',
+            apiUrl: CONFIG.apiUrl,
             additional: '',
             center: [11.35, 46.5],
             zoom: 10

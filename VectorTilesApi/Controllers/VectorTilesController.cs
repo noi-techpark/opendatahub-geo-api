@@ -44,6 +44,7 @@ public class VectorTilesController : ControllerBase
         int x,
         int y,
         string? source = null,
+        string? tagfilter = null,
         string? jsonselector = null,
         string? geocolumn = null)
     {
@@ -57,7 +58,7 @@ public class VectorTilesController : ControllerBase
             if (!isValid)
                 return BadRequest(errorMessage);
 
-            var tile = await _vectorTileService.GetVectorTileAsync(TranslateTypeString2Table(type), type, z, x, y, source, jsonselector, geocolumn, null);
+            var tile = await _vectorTileService.GetVectorTileAsync(TranslateTypeString2Table(type), type, z, x, y, source, tagfilter, jsonselector, geocolumn, null);
 
             if (tile == null || tile.Length == 0)
             {
@@ -95,6 +96,7 @@ public class VectorTilesController : ControllerBase
         int x,
         int y,
         string? source = null,
+        string? tagfilter = null,
         string? jsonselector = null,
         string? geocolumn = null
         )
@@ -109,7 +111,7 @@ public class VectorTilesController : ControllerBase
             if (!isValid)
                 return BadRequest(errorMessage);
 
-            var tile = await _vectorTileService.GetVectorTileAsync(TranslateTypeString2Table(type), type, z, x, y, source, jsonselector, geocolumn, idlist);
+            var tile = await _vectorTileService.GetVectorTileAsync(TranslateTypeString2Table(type), type, z, x, y, source, tagfilter, jsonselector, geocolumn, idlist);
 
             if (tile == null || tile.Length == 0)
             {
