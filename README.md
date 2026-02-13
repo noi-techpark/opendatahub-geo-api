@@ -4,9 +4,9 @@ SPDX-FileCopyrightText: NOI Techpark <digital@noi.bz.it>
 SPDX-License-Identifier: CC0-1.0
 -->
 
-# VectorTilesApi
+# Open Data Hub Geo Api
 
-A .NET Core 9 Web API that serves Mapbox Vector Tiles (MVT) from PostGIS using ST_AsMVT.
+A .NET Core 9 Web API that serves Mapbox Vector Tiles (MVT) from PostGIS using ST_AsMVT. Server Side Clustering is supported.
 
 ## Prerequisites
 
@@ -82,6 +82,9 @@ The API will start at `http://localhost:5023` (or `https://localhost:5023`).
 
 ### 5. Run with Docker
 
+Copy the `.env.example` file and rename to `.env`  
+Insert the Connection String
+
 ```bash
 cd VectorTilesApi
 docker compose build
@@ -99,16 +102,31 @@ The API will start at `http://localhost:5023`.
 GET /api/tiles/{tableName}/{z}/{x}/{y}.pbf
 ```
 
+Currently the Open Data Hub Content Api is fully supported
+
 Parameters:
-- `tableName`: Name of your PostGIS table (e.g., "your_table")
+- `type`: Name of the Open Data Hub data type (_Meta.Type)
 - `z`: Zoom level (0-22)
 - `x`: Tile X coordinate
 - `y`: Tile Y coordinate
+
+Optional Parameters
+- `idlist`: Separator "," pass Ids to filter on
+- `source`: Separator "," Filter by one or more sources
+- `tagfilter`: Separator "," see Open data hub Content Api tagfilter logic
+- `geocolumn`: Define column where geoinfo is stored (standard is taken), needed if more geo columns are available on an object (Example geo column with center_postion, geo column with points,polygons etc...)
+- `jsonselector`: Include more data into the Vector Tiles (by standard Id and where possible a name is included)
 
 Example:
 ```
 http://localhost:5000/api/tiles/your_table/14/2621/6333.pbf
 ```
+
+```
+POST /api/tiles/{tableName}/{z}/{x}/{y}.pbf
+```
+
+If the passed IDs are to large for a GET Request they can be passed as POST Body (json string List).
 
 #### Health Check
 ```
