@@ -51,7 +51,7 @@ public class VectorTilesController : ControllerBase
         string? tagfilter = null,
         string? jsonselector = null,
         string? geocolumn = null,
-        double clustersize = 0)
+        bool cluster = true)
     {
         try
         {
@@ -63,7 +63,7 @@ public class VectorTilesController : ControllerBase
             if (!isValid)
                 return BadRequest(errorMessage);
 
-            var tile = await _vectorTileService.GetVectorTileAsync(TranslateTypeString2Table(type), type, z, x, y, source, tagfilter, jsonselector, geocolumn, !String.IsNullOrEmpty(idlist) ? idlist.Split(",").ToList() : null, clustersize);
+            var tile = await _vectorTileService.GetVectorTileAsync(TranslateTypeString2Table(type), type, z, x, y, source, tagfilter, jsonselector, geocolumn, !String.IsNullOrEmpty(idlist) ? idlist.Split(",").ToList() : null, cluster);
 
             if (tile == null || tile.Length == 0)
             {
@@ -104,7 +104,7 @@ public class VectorTilesController : ControllerBase
         string? tagfilter = null,
         string? jsonselector = null,
         string? geocolumn = null,
-        double clustersize = 0
+        bool cluster = true
         )
     {
         try
@@ -117,7 +117,7 @@ public class VectorTilesController : ControllerBase
             if (!isValid)
                 return BadRequest(errorMessage);
 
-            var tile = await _vectorTileService.GetVectorTileAsync(TranslateTypeString2Table(type), type, z, x, y, source, tagfilter, jsonselector, geocolumn, idlist, clustersize);
+            var tile = await _vectorTileService.GetVectorTileAsync(TranslateTypeString2Table(type), type, z, x, y, source, tagfilter, jsonselector, geocolumn, idlist, cluster);
 
             if (tile == null || tile.Length == 0)
             {

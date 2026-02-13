@@ -45,7 +45,20 @@ function VectorTileMap(config) {
             ],
             'line-opacity': 0.8
         },
-        points: {
+        // points: {
+        //     'circle-radius': [
+        //         'interpolate', ['linear'], ['zoom'],
+        //         0, 2,
+        //         10, 5,
+        //         14, 10,
+        //         18, 15
+        //     ],
+        //     'circle-color': '#FF0000',
+        //     'circle-stroke-width': 2,
+        //     'circle-stroke-color': '#FFFFFF',
+        //     'circle-opacity': 0.8
+        // },
+        unclusteredpoints: {
             'circle-radius': [
                 'interpolate', ['linear'], ['zoom'],
                 0, 2,
@@ -64,13 +77,16 @@ function VectorTileMap(config) {
     const mergedStyles = {
         polygons: { ...defaultStyles.polygons, ...styles.polygons },
         lines: { ...defaultStyles.lines, ...styles.lines },
-        points: { ...defaultStyles.points, ...styles.points }
+        //points: { ...defaultStyles.points, ...styles.points }
+        //clusters: { ...defaultStyles.clusters, ...styles.clusters },
+        unclusteredpoints: { ...defaultStyles.unclusteredpoints, ...styles.unclusteredpoints }
     };
 
     const map = new maplibregl.Map({
         container: containerId,
         style: {
             version: 8,
+            glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
             sources: {
                 'osm': {
                     type: 'raster',
@@ -119,14 +135,77 @@ function VectorTileMap(config) {
                         'line-join': 'round'
                     }
                 },
+                // CLUSTER CIRCLES
                 {
-                    id: 'points',
+                    id: 'clusters',
                     type: 'circle',
                     source: 'vector-tiles',
                     'source-layer': type,
-                    filter: ['==', ['geometry-type'], 'Point'],
-                    paint: mergedStyles.points
+                    filter: ['all',
+                        ['==', ['geometry-type'], 'Point'],
+                        ['==', ['get', 'cluster'], true]
+                    ],
+                    paint: {
+                        'circle-radius': [
+                            'interpolate',
+                            ['linear'],
+                            ['get', 'count'],
+                            2, 12,
+                            10, 18,
+                            50, 28,
+                            200, 40
+                        ],
+                        'circle-color': [
+                            'interpolate',
+                            ['linear'],
+                            ['get', 'count'],
+                            2, '#66c2ff',
+                            10, '#3399ff',
+                            50, '#0066cc',
+                            200, '#003366'
+                        ],
+                        'circle-opacity': 0.85
+                    }
+                },
+                // CLUSTER COUNT LABEL
+                {
+                    id: 'cluster-count',
+                    type: 'symbol',
+                    source: 'vector-tiles',
+                    'source-layer': type,
+                    filter: ['all',
+                        ['==', ['geometry-type'], 'Point'],
+                        ['==', ['get', 'cluster'], true]
+                    ],
+                    layout: {
+                        'text-field': ['get', 'count'],
+                        'text-size': 14
+                    },
+                    paint: {
+                        'text-color': '#ffffff'
+                    }
+                },
+
+                // SINGLE POINTS
+                {
+                    id: 'unclusteredpoints',
+                    type: 'circle',
+                    source: 'vector-tiles',
+                    'source-layer': type,
+                    filter: ['all',
+                        ['==', ['geometry-type'], 'Point'],
+                        ['!=', ['get', 'cluster'], true]
+                    ],
+                    paint: mergedStyles.unclusteredpoints
                 }
+                // {
+                //     id: 'points',
+                //     type: 'circle',
+                //     source: 'vector-tiles',
+                //     'source-layer': type,
+                //     filter: ['==', ['geometry-type'], 'Point'],
+                //     paint: mergedStyles.points
+                // }
             ]
         },
         center: center,
@@ -141,7 +220,7 @@ function VectorTileMap(config) {
     function updateInfo() {
         const center = map.getCenter();
         const zoom = map.getZoom();
-        const features = map.queryRenderedFeatures({ layers: ['polygons', 'lines', 'points'] });
+        const features = map.queryRenderedFeatures({ layers: ['polygons', 'lines', 'clusters', 'unclusteredpoints'] });
         
         const infoElement = document.getElementById('info');
         if (infoElement) {
@@ -162,7 +241,9 @@ function VectorTileMap(config) {
         console.log('🔗 Tile URL:', `${apiUrl}/api/tiles/${type}/{z}/{x}/{y}.pbf${additional}`);
         console.log('Polygons:', map.queryRenderedFeatures({ layers: ['polygons'] }).length);
         console.log('Lines:', map.queryRenderedFeatures({ layers: ['lines'] }).length);
-        console.log('Points:', map.queryRenderedFeatures({ layers: ['points'] }).length);
+        //console.log('Points:', map.queryRenderedFeatures({ layers: ['points'] }).length);
+        console.log('Cluster:', map.queryRenderedFeatures({ layers: ['clusters'] }).length);
+        console.log('Points:', map.queryRenderedFeatures({ layers: ['unclusteredpoints'] }).length);
         updateInfo();
     });
 
@@ -208,6 +289,35 @@ function VectorTileMap(config) {
         return html;
     }
 
+    // Spiderfy on clustering (not very good)
+    // let spiderMarkers = [];
+
+    // function spiderfy(clusterFeature) {
+    //     // Alte Spider-Marker entfernen
+    //     spiderMarkers.forEach(m => m.remove());
+    //     spiderMarkers = [];
+
+    //     const center = clusterFeature.geometry.coordinates;
+    //     const count = clusterFeature.properties.count;
+
+    //     const radius = 0.0002; // Abstand in Grad (feinjustierbar)
+    //     const angleStep = (Math.PI * 2) / count;
+
+    //     for (let i = 0; i < count; i++) {
+    //         const angle = i * angleStep;
+
+    //         const offsetLng = center[0] + radius * Math.cos(angle);
+    //         const offsetLat = center[1] + radius * Math.sin(angle);
+
+    //         const marker = new maplibregl.Marker({ color: '#ff0000' })
+    //             .setLngLat([offsetLng, offsetLat])
+    //             .addTo(map);
+
+    //         spiderMarkers.push(marker);
+    //     }
+    // }
+
+
     // Click handlers
     map.on('click', 'polygons', (e) => {
         const feature = e.features[0];
@@ -227,17 +337,54 @@ function VectorTileMap(config) {
             .addTo(map);
     });
 
-    map.on('click', 'points', (e) => {
+    // map.on('click', 'points', (e) => {
+    //     const feature = e.features[0];
+    //     console.log('🎯 Clicked point:', feature);
+    //     new maplibregl.Popup()
+    //         .setLngLat(e.lngLat)
+    //         .setHTML(createPopup(feature, 'Point'))
+    //         .addTo(map);
+    // });
+
+    map.on('click', 'unclusteredpoints', (e) => {
         const feature = e.features[0];
-        console.log('🎯 Clicked point:', feature);
         new maplibregl.Popup()
             .setLngLat(e.lngLat)
             .setHTML(createPopup(feature, 'Point'))
             .addTo(map);
     });
 
+    // map.on('click', 'clusters', (e) => {
+    //     const feature = e.features[0];
+    //     const coordinates = feature.geometry.coordinates;
+        
+    //     map.easeTo({
+    //         center: coordinates,
+    //         zoom: map.getZoom() + 2
+    //     });
+    // });
+
+    map.on('click', 'clusters', (e) => {
+    const feature = e.features[0];
+
+    // if (map.getZoom() >= 18) {
+    //     spiderfy(feature);
+    // } else {
+        map.easeTo({
+            center: feature.geometry.coordinates,
+            zoom: map.getZoom() + 2
+        });
+        //}
+    });
+
+    //Spiderfy
+    // map.on('movestart', () => {
+    //     spiderMarkers.forEach(m => m.remove());
+    //     spiderMarkers = [];
+    // });
+
     // Hover effects
-    ['points', 'polygons', 'lines'].forEach(layer => {
+    ['unclusteredpoints', 'polygons', 'lines', 'clusters'].forEach(layer => {
         map.on('mouseenter', layer, () => {
             map.getCanvas().style.cursor = 'pointer';
         });

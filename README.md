@@ -196,6 +196,31 @@ initialize with config
 - Analyze query performance: `EXPLAIN ANALYZE` your query
 - Consider using materialized views for complex queries
 
+## Server-Side Clustering
+
+Vector tiles use **grid-based clustering** (PostGIS `ST_SnapToGrid`) for low and mid zoom levels.
+
+```sql
+ST_SnapToGrid(
+    geom,
+    (@xmax - @xmin) /
+    CASE
+        WHEN @zoom < 8 THEN 16
+        WHEN @zoom < 12 THEN 32
+        ELSE 64
+    END
+)
+```
+- Lower zoom → larger grid → bigger clusters  
+- Higher zoom → smaller grid → finer clusters  
+- Clustering is disabled from zoom ≥ 17 (original points returned)  
+
+**Cluster feature properties:**
+
+- `count` → number of aggregated points  
+- `cluster` → `true` / `false`
+
+
 ## License
 
 MIT

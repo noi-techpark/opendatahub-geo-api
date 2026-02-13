@@ -23,7 +23,7 @@ public class VectorTileService : IVectorTileService
             new Npgsql.NpgsqlConnectionStringBuilder(_connectionString).Host);
     }
 
-    public async Task<byte[]> GetVectorTileAsync(string tableName, string type, int z, int x, int y, string? source, string? tagfilter, string? jsonselector, string geocolumn, List<string>? idlist, double clustersize = 0)
+    public async Task<byte[]> GetVectorTileAsync(string tableName, string type, int z, int x, int y, string? source, string? tagfilter, string? jsonselector, string geocolumn, List<string>? idlist, bool cluster = false)
     {
         try
         {
@@ -73,7 +73,7 @@ public class VectorTileService : IVectorTileService
             var tagquery = CreateTagFilter(tagfilter, tableName, out var tagparameters);
 
 
-            var query = GetQuery(clustersize, tableName, type, sourcequery, tagquery, idlistquery, jsonselectorquery, geocolumn, additionalwhereclause);
+            var query = GetQuery(cluster, z, tableName, type, sourcequery, tagquery, idlistquery, jsonselectorquery, geocolumn, additionalwhereclause);
             // Build the query using raw SQL with ST_AsMVT
             // Note: SqlKata doesn't directly support PostGIS functions, so we use raw SQL
             // var query = $@"
@@ -110,6 +110,7 @@ public class VectorTileService : IVectorTileService
             cmd.Parameters.AddWithValue("@ymin", ymin);
             cmd.Parameters.AddWithValue("@xmax", xmax);
             cmd.Parameters.AddWithValue("@ymax", ymax);
+            cmd.Parameters.AddWithValue("@zoom", z);
             // if(idlist != null)
             //     cmd.Parameters.AddWithValue("ids", idlist.ToArray());
 
@@ -152,9 +153,9 @@ public class VectorTileService : IVectorTileService
     }
     
 
-    private static string GetQuery(double clustersize, string tableName, string type, string sourcequery, string tagquery, string idlistquery, string jsonselectorquery, string geocolumn, string additionalwhereclause)
+    private static string GetQuery(bool cluster, int zoomlevel, string tableName, string type, string sourcequery, string tagquery, string idlistquery, string jsonselectorquery, string geocolumn, string additionalwhereclause)
     {
-        if (clustersize == 0)
+        if (!cluster || zoomlevel >= 17)
         {
             // Build the query using raw SQL with ST_AsMVT
             // Note: SqlKata doesn't directly support PostGIS functions, so we use raw SQL
@@ -181,7 +182,7 @@ public class VectorTileService : IVectorTileService
                 WHERE geom IS NOT NULL;
             ";
         }
-else
+        else
         {
             return $@"WITH bounds AS (
                     SELECT ST_MakeEnvelope(@xmin, @ymin, @xmax, @ymax, 3857) AS geom
@@ -204,7 +205,12 @@ else
                         *,
                         ST_SnapToGrid(
                             geom,
-                            (@xmax - @xmin) / {clustersize}
+                            (@xmax - @xmin) / 
+                            CASE
+                                WHEN @zoom < 8 THEN 16
+                                WHEN @zoom < 12 THEN 32
+                                ELSE 64
+                            END
                         ) AS gridcell
                     FROM points
                 ),
