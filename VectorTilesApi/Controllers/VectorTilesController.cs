@@ -23,7 +23,7 @@ public class VectorTilesController : ControllerBase
         _vectorTileService = vectorTileService;
         _logger = logger;
         _allowedGeoColumns = new List<string>() { "geo", "gen_position", "geometry", "gen_center_position" };
-        _allowedJsonSelectors = new List<string>() { "Shortname", "Source", "Active", "Detail.de.Title" };
+        _allowedJsonSelectors = new List<string>() { "Shortname", "Source", "Active", "Detail.de.Title", "Detail.de.BaseText" };
     }
 
     /// <summary>
@@ -35,9 +35,9 @@ public class VectorTilesController : ControllerBase
     /// <param name="y">Tile Y coordinate</param>
     /// <param name="idlist">Filter by a List of Ids</param>
     /// <param name="source">Source Filter</param>
-    /// <param name="geocolumn">Overwrite column with geoinfo (default: geo)</param>
-    /// <param name="tagfilter">Filter by Tags</param>
-    /// <param name="jsonselector">Get More data (by standard Id and where possible a name is included in the Vector Tiles)</param>    
+    /// <param name="geocolumn">Define column where geoinfo is stored (standard is taken), needed if more geo columns are available on an object (Example geo column with center_postion, geo column with points,polygons etc...)</param>
+    /// <param name="tagfilter">Filter by Tags Separator "," see Open data hub Content Api tagfilter logic</param>
+    /// <param name="jsonselector">Include More data (by standard Id and where possible a name is included in the Vector Tiles)</param>    
     /// <returns>Vector tile in protobuf format</returns>
     [HttpGet("{type}/{z}/{x}/{y}.pbf")]
     [Produces("application/x-protobuf")]
@@ -170,10 +170,10 @@ public class VectorTilesController : ControllerBase
 
         TranslateTypeString2Table(type);
 
-        if (geocolumn != null && !_allowedGeoColumns.Contains(geocolumn))
+        if (!String.IsNullOrEmpty(geocolumn) && !_allowedGeoColumns.Contains(geocolumn))
             return (false, "Invalid geo column");
 
-        if (jsonselector != null && !_allowedJsonSelectors.Contains(jsonselector))
+        if (!String.IsNullOrEmpty(jsonselector) && !jsonselector.Split(',').Select(x => x.Trim()).All(x => _allowedJsonSelectors.Contains(x)))
             return (false, "Invalid json selector");
 
         return (true, null);

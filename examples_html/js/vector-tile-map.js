@@ -266,28 +266,60 @@ function VectorTileMap(config) {
     });
 
     // Feature popup helper
+    // Feature popup helper
     function createPopup(feature, featureType) {
         const props = feature.properties;
         let html = `<strong>${featureType} Feature</strong><br>`;
         html += `<strong>ID:</strong> ${props.id}<br>`;
-        
+
         if (featureType === 'Line') {
             html += `<strong>Type:</strong> ${feature.geometry.type}<br>`;
         }
-        
-        if (props.data) {
-            try {
-                const data = JSON.parse(props.data);
-                Object.keys(data).forEach(key => {
-                    html += `<strong>${key}:</strong> ${data[key]}<br>`;
-                });
-            } catch (e) {
-                html += `<strong>Data:</strong> ${props.data}<br>`;
+
+        // 1️⃣ Alle flachen Properties außer count & cluster
+        Object.keys(props).forEach(key => {
+            if (['id', 'count', 'cluster'].includes(key)) return;
+            // Wenn es die 'data' Spalte ist, dann parse JSON
+            if (key === 'data' && props.data) {
+                try {
+                    const data = JSON.parse(props.data);
+                    Object.keys(data).forEach(k => {
+                        html += `<strong>${k}:</strong> ${data[k]}<br>`;
+                    });
+                } catch (e) {
+                    html += `<strong>Data:</strong> ${props.data}<br>`;
+                }
+            } else {
+                html += `<strong>${key}:</strong> ${props[key]}<br>`;
             }
-        }
-        
+        });
+
         return html;
     }
+    // function createPopup(feature, featureType) {
+    //     const props = feature.properties;
+    //     let html = `<strong>${featureType} Feature</strong><br>`;
+    //     html += `<strong>ID:</strong> ${props.id}<br>`;
+        
+    //     if (featureType === 'Line') {
+    //         html += `<strong>Type:</strong> ${feature.geometry.type}<br>`;
+    //     }
+        
+    //     if (props.data) {
+    //         try {
+    //             const data = JSON.parse(props.data);
+    //             Object.keys(data).forEach(key => {
+    //                 html += `<strong>${key}:</strong> ${data[key]}<br>`;
+    //             });
+    //         } catch (e) {
+    //             html += `<strong>Data:</strong> ${props.data}<br>`;
+    //         }
+    //     }
+        
+    //     return html;
+    // }
+
+
 
     // Spiderfy on clustering (not very good)
     // let spiderMarkers = [];

@@ -38,27 +38,15 @@ public class VectorTileService : IVectorTileService
             //                 : "";
 
             var idlistquery = CreateIdFilter(idlist, tableName, out var idparameters);
-
-            //var jsonselectorquery = "data#>>'{Shortname}' as data";
-            var jsonselectorquery = "gen_shortname as data";
-
+            
             var additionalwhereclause = " AND gen_access_role @> Array['ANONYMOUS']";
 
-            if (jsonselector != null)
-            {
-                jsonselectorquery = "";
-                var jsonselectorfields = jsonselector.Split(",");
-                foreach (var jsonselectorfield in jsonselectorfields)
-                {
-                    var jsonselectparsed = jsonselectorfield.Replace(".", ",");
-                    jsonselectorquery = jsonselectorquery + $@"data#>>'{jsonselectparsed}' as data.{jsonselectparsed}";
-                }
-            }
+            var jsonselectorqueryresult = CreateJsonBSelector(jsonselector);
 
             //Special Case geoshape
             if (tableName == "geoshapes")
             {
-                jsonselectorquery = "name";
+                jsonselectorqueryresult.Item1 = "name";
                 additionalwhereclause = "";
             }
 
@@ -73,38 +61,8 @@ public class VectorTileService : IVectorTileService
             var tagquery = CreateTagFilter(tagfilter, tableName, out var tagparameters);
 
 
-            var query = GetQuery(cluster, z, tableName, type, sourcequery, tagquery, idlistquery, jsonselectorquery, geocolumn, additionalwhereclause);
-            // Build the query using raw SQL with ST_AsMVT
-            // Note: SqlKata doesn't directly support PostGIS functions, so we use raw SQL
-            // var query = $@"
-            //     WITH mvtgeom AS (
-            //         SELECT
-            //             id,
-            //             {jsonselectorquery},
-            //             ST_AsMVTGeom(
-            //                 ST_Transform({geocolumn}, 3857),
-            //                 ST_MakeEnvelope(@xmin, @ymin, @xmax, @ymax, 3857),
-            //                 4096,
-            //                 256,
-            //                 true
-            //             ) AS geom
-            //         FROM {tableName}
-            //          WHERE ST_Intersects(
-            //              ST_Transform({geocolumn}, 3857),
-            //              ST_MakeEnvelope(@xmin, @ymin, @xmax, @ymax, 3857)
-            //          ){sourcequery}{tagquery}{idlistquery}{additionalwhereclause}
-            //     )
-            //     SELECT ST_AsMVT(mvtgeom.*, '{type}', 4096, 'geom')
-            //     FROM mvtgeom
-            //     WHERE geom IS NOT NULL;
-            // ";
-
-
-            // WHERE ST_Intersects(
-            //             ST_Transform({geocolumn}, 3857),
-            //             ST_MakeEnvelope(@xmin, @ymin, @xmax, @ymax, 3857)
-            //         )
-
+            var query = GetQuery(cluster, z, tableName, type, sourcequery, tagquery, idlistquery, jsonselectorqueryresult.Item1, jsonselectorqueryresult.Item2, geocolumn, additionalwhereclause);
+    
             await using var cmd = new NpgsqlCommand(query, connection);
             cmd.Parameters.AddWithValue("@xmin", xmin);
             cmd.Parameters.AddWithValue("@ymin", ymin);
@@ -153,7 +111,7 @@ public class VectorTileService : IVectorTileService
     }
     
 
-    private static string GetQuery(bool cluster, int zoomlevel, string tableName, string type, string sourcequery, string tagquery, string idlistquery, string jsonselectorquery, string geocolumn, string additionalwhereclause)
+    private static string GetQuery(bool cluster, int zoomlevel, string tableName, string type, string sourcequery, string tagquery, string idlistquery, string jsonselectorquery, string jsonselectorquerycluster, string geocolumn, string additionalwhereclause)
     {
         if (!cluster || zoomlevel >= 17)
         {
@@ -219,7 +177,7 @@ public class VectorTileService : IVectorTileService
                     SELECT
                         MIN(id) AS id,
                         CASE WHEN COUNT(*) = 1
-                            THEN MIN(data)
+                            THEN {jsonselectorquerycluster}
                             ELSE NULL
                         END AS data,
                         COUNT(*) AS count,
@@ -249,51 +207,7 @@ public class VectorTileService : IVectorTileService
                 WHERE geom IS NOT NULL;"
                 ;
         }
-        // else
-        // {
-        //     return $@"WITH bounds AS (
-        //         SELECT ST_MakeEnvelope(@xmin, @ymin, @xmax, @ymax, 3857) AS geom
-        //     ),
-        //     points AS (
-        //         SELECT
-        //             id,
-        //             {jsonselectorquery},
-        //             ST_Transform({geocolumn}, 3857) AS geom
-        //         FROM {tableName}, bounds
-        //         WHERE ST_Intersects(ST_Transform({geocolumn}, 3857), bounds.geom)
-        //         {sourcequery}{tagquery}{idlistquery}{additionalwhereclause}
-        //     ),
-        //     clustered AS (
-        //         SELECT
-        //             COUNT(*) AS count,
-        //             ST_Centroid(ST_Collect(geom)) AS geom
-        //         FROM (
-        //             SELECT
-        //                 geom,
-        //                 ST_SnapToGrid(
-        //                     geom,
-        //                     (@xmax - @xmin) / {clustersize}   -- Clustergröße anpassen
-        //                 ) AS gridcell
-        //             FROM points
-        //         ) g
-        //         GROUP BY gridcell
-        //     ),
-        //     mvtgeom AS (
-        //         SELECT
-        //             count,
-        //             ST_AsMVTGeom(
-        //                 geom,
-        //                 ST_MakeEnvelope(@xmin, @ymin, @xmax, @ymax, 3857),
-        //                 4096,
-        //                 256,
-        //                 true
-        //             ) AS geom
-        //         FROM clustered
-        //     )
-        //     SELECT ST_AsMVT(mvtgeom.*, '{type}', 4096, 'geom')
-        //     FROM mvtgeom
-        //     WHERE geom IS NOT NULL;";
-        // }
+      
     }
 
     /// <summary>
@@ -450,5 +364,28 @@ public class VectorTileService : IVectorTileService
 
             return $" AND gen_tags @> ARRAY[{string.Join(", ", paramNames)}]";
         }
+    }
+
+    private static (string, string) CreateJsonBSelector(string jsonselector)
+    {
+        if (jsonselector == null)
+            return ("gen_shortname as data","MIN(data)");
+
+        var parts = jsonselector.Split(',');
+
+        var jsonBuildParts = parts
+            .Select(p =>
+            {
+                var trimmed = p.Trim();
+
+                // Detail.de.Title → Detail,de,Title
+                var jsonPath = string.Join(",", trimmed.Split('.'));
+
+                return $"'{trimmed}', data#>'{{{jsonPath}}}'";
+            });
+
+        var selectquery = $@" jsonb_strip_nulls(jsonb_build_object({string.Join(", ", jsonBuildParts)})) AS data";
+
+        return (selectquery, "jsonb_agg(data)->0");
     }
 }
