@@ -1,0 +1,37 @@
+<!--
+SPDX-FileCopyrightText: NOI Techpark <digital@noi.bz.it>
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Digiway Geoshapes Provincia TN</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js'></script>
+    <link href='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css' rel='stylesheet' />
+    <link href='../css/style.css' rel='stylesheet'>
+</head>
+<body>
+    <div class="debug">
+        <strong>🔍 Debug Info</strong><br>
+        <div id="info">Loading...</div>
+    </div>
+    <div id="map"></div>
+    <script src="../js/vector-tile-map.js"></script>
+    <script src="../js/config.js"></script>
+    
+    <!-- Initialize with your config -->
+    <script>
+        const myMap = new VectorTileMap({
+            containerId: 'map',
+            type: 'geoshape',
+            apiUrl: CONFIG.apiUrl,
+            additional: '?source=civis.geoserver&idlist=routes-hikingtrails.10216044,routes-hikingtrails.10214776,routes-hikingtrails.10216402,routes-hikingtrails.10216197,routes-hikingtrails.10216247,routes-hikingtrails.10212684,routes-hikingtrails.10212681,routes-hikingtrails.10213533,routes-hikingtrails.10212682,routes-hikingtrails.10213027,routes-hikingtrails.10212769,routes-hikingtrails.10216756,routes-hikingtrails.10216757,routes-hikingtrails.10214187,routes-hikingtrails.10216525,routes-hikingtrails.10213314,routes-hikingtrails.10213627,routes-hikingtrails.10214122,routes-hikingtrails.10214185,routes-hikingtrails.10214866,routes-hikingtrails.10212711,routes-hikingtrails.10214123,routes-hikingtrails.10216138,routes-hikingtrails.10216190,routes-hikingtrails.10216370,routes-hikingtrails.10214640,routes-hikingtrails.10214701,routes-hikingtrails.10215680,routes-hikingtrails.10216137,routes-hikingtrails.10214391,routes-hikingtrails.10213574,routes-hikingtrails.10213241,routes-hikingtrails.10216976,routes-hikingtrails.10215025,routes-hikingtrails.10212936,routes-hikingtrails.10215751,routes-hikingtrails.10216019,routes-hikingtrails.10212768,routes-hikingtrails.10214945,routes-hikingtrails.10215675,routes-hikingtrails.10213276,routes-hikingtrails.10214907,routes-hikingtrails.10216085,routes-hikingtrails.10215117,routes-hikingtrails.10214720,routes-hikingtrails.10214125,routes-hikingtrails.10216367,routes-hikingtrails.10214297,routes-hikingtrails.10213580,routes-hikingtrails.10214756,routes-hikingtrails.10214316,routes-hikingtrails.10215859,routes-hikingtrails.10213543,routes-hikingtrails.10215809,routes-hikingtrails.10215001,routes-hikingtrails.10214232,routes-hikingtrails.10213065,routes-hikingtrails.10214787,routes-hikingtrails.10214965,routes-hikingtrails.10212874,routes-hikingtrails.10214385,routes-hikingtrails.10213508,routes-hikingtrails.10214377,routes-hikingtrails.10214464,routes-hikingtrails.10214376,routes-hikingtrails.10215224,routes-hikingtrails.10216440,routes-hikingtrails.10216098,routes-hikingtrails.10216603,routes-hikingtrails.10216036,routes-hikingtrails.10213297,routes-hikingtrails.10213071,routes-hikingtrails.10215188,routes-hikingtrails.10213174,routes-hikingtrails.10213403,routes-hikingtrails.10213175,routes-hikingtrails.10214813,routes-hikingtrails.10214418,routes-hikingtrails.10214811,routes-hikingtrails.10214496,routes-hikingtrails.10213227,routes-hikingtrails.10215226,routes-hikingtrails.10216060,routes-hikingtrails.10216278,routes-hikingtrails.10214077,routes-hikingtrails.10216053,routes-hikingtrails.10216970,routes-hikingtrails.10216280,routes-hikingtrails.10216279,routes-hikingtrails.10213983,routes-hikingtrails.10213594,routes-hikingtrails.10214274,routes-hikingtrails.10213313,routes-hikingtrails.10212908,routes-hikingtrails.10212787,routes-hikingtrails.10215705,routes-hikingtrails.10213527,routes-hikingtrails.10214893',
+            center: [11.35, 46.5],
+            zoom: 10
+        });
+    </script>    
+</body>
+</html>

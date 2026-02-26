@@ -19,7 +19,7 @@ function VectorTileMap(config) {
         apiUrl,
         additional = '',
         center = [11.35, 46.5],
-        zoom = 10,
+        zoom = 12,
         styles = {}
     } = config;
 
@@ -30,47 +30,50 @@ function VectorTileMap(config) {
     // Default styles
     const defaultStyles = {
         polygons: {
-            'fill-color': '#0080FF',
-            'fill-opacity': 0.4,
-            'fill-outline-color': '#004080'
+            'fill-color': [
+                'case', ['boolean', ['feature-state', 'hover'], false],
+                '#0055CC',   // hovered - darker blue
+                '#0080FF'    // normal
+            ],
+            'fill-opacity': [
+                'case', ['boolean', ['feature-state', 'hover'], false],
+                0.7,   // hovered
+                0.4    // normal
+            ],
+            'fill-outline-color': [
+                'case', ['boolean', ['feature-state', 'hover'], false],
+                '#FFFFFF',   // hovered - white outline to pop
+                '#004080'    // normal
+            ]
         },
         lines: {
             'line-color': '#404040',
             'line-width': [
                 'interpolate', ['linear'], ['zoom'],
-                8, 1,
-                12, 2,
-                16, 4,
-                20, 6
+                8,  ['case', ['boolean', ['feature-state', 'hover'], false], 5, 1],
+                12, ['case', ['boolean', ['feature-state', 'hover'], false], 5, 2],
+                16, ['case', ['boolean', ['feature-state', 'hover'], false], 5, 4],
+                20, ['case', ['boolean', ['feature-state', 'hover'], false], 5, 6]
             ],
-            'line-opacity': 0.8
-        },
-        // points: {
-        //     'circle-radius': [
-        //         'interpolate', ['linear'], ['zoom'],
-        //         0, 2,
-        //         10, 5,
-        //         14, 10,
-        //         18, 15
-        //     ],
-        //     'circle-color': '#FF0000',
-        //     'circle-stroke-width': 2,
-        //     'circle-stroke-color': '#FFFFFF',
-        //     'circle-opacity': 0.8
-        // },
+            'line-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 1.0, 0.8]
+        },        
         unclusteredpoints: {
             'circle-radius': [
                 'interpolate', ['linear'], ['zoom'],
-                0, 2,
-                10, 5,
-                14, 10,
-                18, 15
+                0,  ['case', ['boolean', ['feature-state', 'hover'], false], 14, 2],
+                10, ['case', ['boolean', ['feature-state', 'hover'], false], 14, 5],
+                14, ['case', ['boolean', ['feature-state', 'hover'], false], 14, 10],
+                18, ['case', ['boolean', ['feature-state', 'hover'], false], 14, 15]
             ],
-            'circle-color': '#FF0000',
+            'circle-color': [
+                'case', ['boolean', ['feature-state', 'hover'], false],
+                '#FF6600',   // hovered
+                '#FF0000'    // normal
+            ],
             'circle-stroke-width': 2,
             'circle-stroke-color': '#FFFFFF',
             'circle-opacity': 0.8
-        }
+        },
     };
 
     // Merge custom styles with defaults
@@ -98,7 +101,8 @@ function VectorTileMap(config) {
                     type: 'vector',
                     tiles: [`${apiUrl}/api/tiles/${type}/{z}/{x}/{y}.pbf${additional}`],
                     minzoom: 0,
-                    maxzoom: 22
+                    maxzoom: 22,
+                    promoteId: 'id'
                 }
             },
             layers: [
@@ -415,14 +419,39 @@ function VectorTileMap(config) {
     //     spiderMarkers = [];
     // });
 
+    const hoveredIds = { lines: null, unclusteredpoints: null, polygons: null };
+
     // Hover effects
     ['unclusteredpoints', 'polygons', 'lines', 'clusters'].forEach(layer => {
-        map.on('mouseenter', layer, () => {
+        map.on('mouseenter', layer, (e) => {
             map.getCanvas().style.cursor = 'pointer';
+
+            // Clear previous hover on this layer
+            if (hoveredIds[layer] !== null) {
+                map.setFeatureState(
+                    { source: 'vector-tiles', sourceLayer: type, id: hoveredIds[layer] },
+                    { hover: false }
+                );
+            }
+
+            // Set new hover
+            hoveredIds[layer] = e.features[0].id;
+            map.setFeatureState(
+                { source: 'vector-tiles', sourceLayer: type, id: hoveredIds[layer] },
+                { hover: true }
+            );
         });
 
         map.on('mouseleave', layer, () => {
             map.getCanvas().style.cursor = '';
+
+            if (hoveredIds[layer] !== null) {
+                map.setFeatureState(
+                    { source: 'vector-tiles', sourceLayer: type, id: hoveredIds[layer] },
+                    { hover: false }
+                );
+                hoveredIds[layer] = null;
+            }
         });
     });
 

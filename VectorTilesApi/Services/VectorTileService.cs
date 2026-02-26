@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+using System.Data;
 using Npgsql;
 
 namespace OpenDataHubVectorTileApi.Services;
@@ -47,6 +48,7 @@ public class VectorTileService : IVectorTileService
             if (tableName == "geoshapes")
             {
                 jsonselectorqueryresult.Item1 = "name";
+                jsonselectorqueryresult.Item2 = "MIN(name)";
                 additionalwhereclause = "";
             }
 
@@ -93,14 +95,27 @@ public class VectorTileService : IVectorTileService
                     .ToDictionary(p => p.ParameterName, p => p.Value)
             );
 
-            var result = await cmd.ExecuteScalarAsync();
+            //This often leads to  "Exception while reading from stream" 
+            // var result = await cmd.ExecuteScalarAsync();
 
-            if (result == null || result == DBNull.Value)
+            // if (result == null || result == DBNull.Value)
+            // {
+            //     return Array.Empty<byte>();
+            // }
+
+            // return (byte[])result;
+
+            await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess);
+
+            if (!await reader.ReadAsync() || reader.IsDBNull(0))
             {
                 return Array.Empty<byte>();
             }
 
-            return (byte[])result;
+            await using var stream = reader.GetStream(0);
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            return ms.ToArray();
         }
         catch (Exception ex)
         {
@@ -113,7 +128,7 @@ public class VectorTileService : IVectorTileService
 
     private static string GetQuery(bool cluster, int zoomlevel, string tableName, string type, string sourcequery, string tagquery, string idlistquery, string jsonselectorquery, string jsonselectorquerycluster, string geocolumn, string additionalwhereclause)
     {
-        if (!cluster || zoomlevel >= 17)
+        if (!cluster || zoomlevel >= 17)        
         {
             // Build the query using raw SQL with ST_AsMVT
             // Note: SqlKata doesn't directly support PostGIS functions, so we use raw SQL
@@ -139,6 +154,124 @@ public class VectorTileService : IVectorTileService
                 FROM mvtgeom
                 WHERE geom IS NOT NULL;
             ";
+        }
+        else if(tableName == "geoshapes")
+        {
+            return $@"WITH bounds AS (
+                    SELECT ST_MakeEnvelope(@xmin, @ymin, @xmax, @ymax, 3857) AS geom
+                ),
+
+                shapes AS (
+                    SELECT
+                        id,
+                        {jsonselectorquery},
+                        ST_Transform({geocolumn}, 3857) AS geom,
+                        ST_GeometryType(ST_Transform({geocolumn}, 3857)) AS geom_type
+                    FROM {tableName}, bounds
+                    WHERE ST_Intersects(
+                        ST_Transform({geocolumn}, 3857),
+                        bounds.geom
+                    ){sourcequery}{tagquery}{idlistquery}{additionalwhereclause}
+                ),
+
+                -- === POINT CLUSTERING ===
+                grid AS (
+                    SELECT
+                        *,
+                        ST_SnapToGrid(
+                            geom,
+                            (@xmax - @xmin) /
+                            CASE
+                                WHEN @zoom < 8  THEN 16
+                                WHEN @zoom < 12 THEN 32
+                                ELSE 64
+                            END
+                        ) AS gridcell
+                    FROM shapes
+                    WHERE geom_type IN ('ST_Point', 'ST_MultiPoint')
+                ),
+                clustered AS (
+                    SELECT
+                        MIN(id) AS id,
+                        CASE WHEN COUNT(*) = 1
+                            THEN {jsonselectorquerycluster}
+                            ELSE NULL
+                        END AS data,
+                        COUNT(*) AS count,
+                        false::boolean AS cluster,
+                        ST_Centroid(ST_Collect(geom)) AS geom
+                    FROM grid
+                    GROUP BY gridcell
+                ),
+
+                -- === POLYGON SIMPLIFICATION ===
+                simplified_polygons AS (
+                    SELECT
+                        id,
+                        {jsonselectorquery} AS data,
+                        1 AS count,
+                        false::boolean AS cluster,
+                        CASE
+                            WHEN ST_Area(geom) < POWER((@xmax - @xmin) / 4096.0, 2) * 4
+                                THEN NULL
+                            ELSE ST_SimplifyPreserveTopology(
+                                geom,
+                                (@xmax - @xmin) / 4096.0
+                            )
+                        END AS geom
+                    FROM shapes
+                    WHERE geom_type IN ('ST_Polygon', 'ST_MultiPolygon')
+                ),
+
+                -- === LINESTRING SIMPLIFICATION ===
+                simplified_lines AS (
+                    SELECT
+                        id,
+                        {jsonselectorquery} AS data,
+                        1 AS count,
+                        false::boolean AS cluster,
+                        CASE
+                            WHEN ST_Length(geom) < ((@xmax - @xmin) / 4096.0) * 2
+                                THEN NULL
+                            ELSE ST_SimplifyPreserveTopology(
+                                geom,
+                                (@xmax - @xmin) / 4096.0
+                            )
+                        END AS geom
+                    FROM shapes
+                    WHERE geom_type IN ('ST_LineString', 'ST_MultiLineString')
+                ),
+
+                -- === MERGE ALL ===
+                merged AS (
+                    SELECT id, data, count, cluster, geom FROM clustered
+                    UNION ALL
+                    SELECT id, data, count, cluster, geom FROM simplified_polygons
+                    UNION ALL
+                    SELECT id, data, count, cluster, geom FROM simplified_lines
+                ),
+
+                mvtgeom AS (
+                    SELECT
+                        id,
+                        data,
+                        count,
+                        (count > 1) AS cluster,
+                        ST_AsMVTGeom(
+                            geom,
+                            ST_MakeEnvelope(@xmin, @ymin, @xmax, @ymax, 3857),
+                            4096,
+                            256,
+                            true
+                        ) AS geom
+                    FROM merged
+                    WHERE geom IS NOT NULL
+                )
+
+                SELECT ST_AsMVT(mvtgeom.*, '{type}', 4096, 'geom')
+                FROM mvtgeom
+                WHERE geom IS NOT NULL;"
+                ;
         }
         else
         {
