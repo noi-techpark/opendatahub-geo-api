@@ -273,6 +273,120 @@ public class VectorTileService : IVectorTileService
                 WHERE geom IS NOT NULL;"
                 ;
         }
+        else if(tableName == "spatialdatas" || tableName == "urbangreens" || tableName == "announcements")
+        {
+            return $@"
+                    WITH bounds AS (
+                        SELECT
+                            ST_MakeEnvelope(@xmin, @ymin, @xmax, @ymax, 3857) AS geom_3857,
+                            ST_Transform(ST_MakeEnvelope(@xmin, @ymin, @xmax, @ymax, 3857), 4326) AS geom
+                    ),
+
+                    -- Point clustering layer (always present)
+                    points AS (
+                        SELECT
+                            id,
+                            {jsonselectorquery},
+                            gen_center_position AS geom,
+                            ST_XMax(bounds.geom) - ST_XMin(bounds.geom) AS tile_width  -- ← carry it through
+                        FROM {tableName}, bounds
+                        WHERE ST_Intersects(
+                            gen_center_position,
+                            bounds.geom
+                        ){sourcequery}{tagquery}{idlistquery}{additionalwhereclause}
+                    ),
+
+                    grid AS (
+                        SELECT
+                            *,
+                            ST_SnapToGrid(
+                                geom,
+                                tile_width /
+                                CASE
+                                    WHEN @zoom < 8  THEN 16
+                                    WHEN @zoom < 12 THEN 32
+                                    ELSE 64
+                                END
+                            ) AS gridcell
+                        FROM points
+                    ),
+
+                    clustered AS (
+                        SELECT
+                            MIN(id) AS id,
+                            CASE WHEN COUNT(*) = 1
+                                THEN {jsonselectorquerycluster}
+                                ELSE NULL
+                            END AS data,
+                            COUNT(*) AS count,
+                            ST_Centroid(ST_Collect(geom)) AS geom
+                        FROM grid
+                        GROUP BY gridcell
+                    ),
+
+                    mvtgeom_points AS (
+                        SELECT
+                            c.id,
+                            c.data,
+                            c.count,
+                            (c.count > 1) AS cluster,
+                            ST_AsMVTGeom(
+                                c.geom,
+                                bounds.geom,
+                                4096, 256, true
+                            ) AS geom
+                        FROM clustered c, bounds
+                    ),
+
+                    -- Track layer (only populated at zoom >= 12)
+                    tracks AS (
+                        SELECT
+                            id,
+                            {jsonselectorquery},
+                            ST_Simplify(
+                                geo,
+                                CASE
+                                    WHEN @zoom < 14 THEN 0.0001
+                                    WHEN @zoom < 16 THEN 0.00005
+                                    ELSE 0.00001
+                                END
+                            ) AS geom
+                        FROM {tableName}, bounds
+                        WHERE @zoom >= 12
+                        AND ST_Intersects(
+                            geo,
+                            bounds.geom
+                        ){sourcequery}{tagquery}{idlistquery}{additionalwhereclause}
+                    ),
+
+                    mvtgeom_tracks AS (
+                        SELECT
+                            t.id,
+                            t.data,
+                            ST_AsMVTGeom(
+                                t.geom,
+                                bounds.geom,
+                                4096, 256, true
+                            ) AS geom
+                        FROM tracks t, bounds
+                        WHERE t.geom IS NOT NULL
+                    )
+
+                    SELECT ST_AsMVT(mvtgeom.*, '{type}', 4096, 'geom')
+                    FROM (
+                        -- Clustered points (always)
+                        SELECT id, data, count, (count > 1) AS cluster, 'point' AS geom_type, geom
+                        FROM mvtgeom_points
+                        WHERE geom IS NOT NULL
+
+                        UNION ALL
+
+                        -- Tracks (zoom >= 12 only, already guarded in the CTE)
+                        SELECT id, data, null AS count, false AS cluster, 'track' AS geom_type, geom
+                        FROM mvtgeom_tracks
+                        WHERE geom IS NOT NULL
+                    ) mvtgeom;";
+        }
         else
         {
             return $@"WITH bounds AS (

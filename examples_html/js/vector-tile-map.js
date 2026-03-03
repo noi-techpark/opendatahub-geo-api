@@ -89,7 +89,8 @@ function VectorTileMap(config) {
         container: containerId,
         style: {
             version: 8,
-            glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+            //glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+            glyphs: "https://tiles.stadiamaps.com/fonts/{fontstack}/{range}.pbf",
             sources: {
                 'osm': {
                     type: 'raster',
@@ -262,7 +263,7 @@ function VectorTileMap(config) {
     });
 
     map.on('error', (e) => {
-        console.error('❌ Error:', e);
+        console.error('Error:', e);
         const infoElement = document.getElementById('info');
         if (e.error && infoElement) {
             infoElement.innerHTML += `<br><span style="color:red;">Error: ${e.error.message}</span>`;
@@ -425,6 +426,9 @@ function VectorTileMap(config) {
     ['unclusteredpoints', 'polygons', 'lines', 'clusters'].forEach(layer => {
         map.on('mouseenter', layer, (e) => {
             map.getCanvas().style.cursor = 'pointer';
+
+            const id = e.features[0]?.id;
+            if (id == null) return; // ← guard  
 
             // Clear previous hover on this layer
             if (hoveredIds[layer] !== null) {
