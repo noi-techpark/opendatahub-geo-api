@@ -14,7 +14,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
     <link href='css/style.css' rel='stylesheet'>
 </head>
 <body>
-    <h1>Activities & Pois with Source LTS</h1>
+    <h1>Announcements</h1>
     <div class="debug">
         <strong>🔍 Debug Info</strong><br>
         <div id="info">Loading...</div>
@@ -27,12 +27,12 @@ SPDX-License-Identifier: AGPL-3.0-or-later
     <script>
         const myMap = new VectorTileMap({
             containerId: 'map',
-            type: 'accommodation',
+            type: 'announcement',
             apiUrl: CONFIG.apiUrl,
-            additional: '?enableclustering=true',
+            additional: '?operationmode=points',
             center: [11.35, 46.5],
             zoom: 10
         });
-    </script>    
+    </script>
 </body>
 </html>

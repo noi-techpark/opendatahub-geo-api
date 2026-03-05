@@ -24,7 +24,22 @@ public class VectorTileService : IVectorTileService
             new Npgsql.NpgsqlConnectionStringBuilder(_connectionString).Host);
     }
 
-    public async Task<byte[]> GetVectorTileAsync(string tableName, string type, int z, int x, int y, string? source, string? tagfilter, string? jsonselector, string geocolumn, List<string>? idlist, bool cluster = false)
+    public async Task<byte[]> GetVectorTileAsync(
+        string tableName, 
+        string type, 
+        int z, 
+        int x, 
+        int y, 
+        string? source, 
+        string? tagfilter, 
+        string? jsonselector, 
+        string? geometrycolumn, 
+        string geometrycentercolumn, 
+        List<string>? idlist, 
+        bool cluster = false,
+        AllowedOperationMode operationMode = AllowedOperationMode.points,
+        int displayTracksonZoomLevel = 12
+        )
     {
         try
         {
@@ -34,36 +49,46 @@ public class VectorTileService : IVectorTileService
             // Calculate tile bounds using Web Mercator projection (EPSG:3857)
             var (xmin, ymin, xmax, ymax) = TileToBounds(x, y, z);
 
-            // var idlistquery = idlist != null 
-            //                 ? $@" AND WHERE id = ANY(@ids)"
-            //                 : "";
-
-            var idlistquery = CreateIdFilter(idlist, tableName, out var idparameters);
+            var idlistquery = CreateIdFilter(idlist, type, out var idparameters);
             
             var additionalwhereclause = " AND gen_access_role @> Array['ANONYMOUS']";
 
-            var jsonselectorqueryresult = CreateJsonBSelector(jsonselector);
+            var jsonselectorqueryresult = CreateJsonBSelector(type, jsonselector);
 
-            //Special Case geoshape
-            if (tableName == "geoshapes")
+            //Special Case geoshape and spatialdata clear additionalwhereclause 
+            if (tableName == "geoshapes" || tableName == "spatialdatas")
             {
-                jsonselectorqueryresult.Item1 = "name";
-                jsonselectorqueryresult.Item2 = "MIN(name)";
                 additionalwhereclause = "";
             }
-
-            //Special Case spatialdata
-            if (tableName == "spatialdatas")
+            else  if (tableName == "timeseries")
             {
+                //TODO
                 additionalwhereclause = "";
             }
 
             //Get the Source query
-            var sourcequery = CreateSourceFilter(source, tableName, out var sourceparameters);
-            var tagquery = CreateTagFilter(tagfilter, tableName, out var tagparameters);
+            var sourcequery = CreateSourceFilter(source, type, out var sourceparameters);
+            var tagquery = CreateTagFilter(tagfilter, type, out var tagparameters);
 
+            var (clusterpoints, showpoints, showtracks, showtracksatzoomlevel) = CheckOperationMode(operationMode, cluster, displayTracksonZoomLevel);
 
-            var query = GetQuery(cluster, z, tableName, type, sourcequery, tagquery, idlistquery, jsonselectorqueryresult.Item1, jsonselectorqueryresult.Item2, geocolumn, additionalwhereclause);
+            var query = GetQuery(                
+                z, 
+                tableName, 
+                type, 
+                sourcequery, 
+                tagquery, 
+                idlistquery,
+                jsonselectorqueryresult.Item1, 
+                jsonselectorqueryresult.Item2,
+                geometrycolumn,
+                geometrycentercolumn,
+                additionalwhereclause,
+                clusterpoints, 
+                showpoints,
+                showtracks,
+                showtracksatzoomlevel
+                );
     
             await using var cmd = new NpgsqlCommand(query, connection);
             cmd.Parameters.AddWithValue("@xmin", xmin);
@@ -126,9 +151,24 @@ public class VectorTileService : IVectorTileService
     }
     
 
-    private static string GetQuery(bool cluster, int zoomlevel, string tableName, string type, string sourcequery, string tagquery, string idlistquery, string jsonselectorquery, string jsonselectorquerycluster, string geocolumn, string additionalwhereclause)
-    {
-        if (!cluster || zoomlevel >= 17)        
+    private static string GetQuery(        
+        int zoomlevel, 
+        string tableName, 
+        string type, 
+        string sourcequery, 
+        string tagquery, 
+        string idlistquery, 
+        string jsonselectorquery, 
+        string jsonselectorquerycluster, 
+        string geometrycolumn?,
+        string geometrycentercolumn,
+        string additionalwhereclause,
+        bool clusterpoints, 
+        bool showpoints,
+        bool showtracks,
+        int showtracksatzoomlevel)
+    {      
+        if (!clusterpoints || zoomlevel >= 17)        
         {
             // Build the query using raw SQL with ST_AsMVT
             // Note: SqlKata doesn't directly support PostGIS functions, so we use raw SQL
@@ -138,7 +178,7 @@ public class VectorTileService : IVectorTileService
                         id,
                         {jsonselectorquery},
                         ST_AsMVTGeom(
-                            ST_Transform({geocolumn}, 3857),
+                            ST_Transform({geometrycentercolumn}, 3857),
                             ST_MakeEnvelope(@xmin, @ymin, @xmax, @ymax, 3857),
                             4096,
                             256,
@@ -146,7 +186,7 @@ public class VectorTileService : IVectorTileService
                         ) AS geom
                     FROM {tableName}
                      WHERE ST_Intersects(
-                         ST_Transform({geocolumn}, 3857),
+                         ST_Transform({geometrycentercolumn}, 3857),
                          ST_MakeEnvelope(@xmin, @ymin, @xmax, @ymax, 3857)
                      ){sourcequery}{tagquery}{idlistquery}{additionalwhereclause}
                 )
@@ -165,11 +205,11 @@ public class VectorTileService : IVectorTileService
                     SELECT
                         id,
                         {jsonselectorquery},
-                        ST_Transform({geocolumn}, 3857) AS geom,
-                        ST_GeometryType(ST_Transform({geocolumn}, 3857)) AS geom_type
+                        ST_Transform({geometrycolumn}, 3857) AS geom,
+                        ST_GeometryType(ST_Transform({geometrycolumn}, 3857)) AS geom_type
                     FROM {tableName}, bounds
                     WHERE ST_Intersects(
-                        ST_Transform({geocolumn}, 3857),
+                        ST_Transform({geometrycolumn}, 3857),
                         bounds.geom
                     ){sourcequery}{tagquery}{idlistquery}{additionalwhereclause}
                 ),
@@ -287,11 +327,11 @@ public class VectorTileService : IVectorTileService
                         SELECT
                             id,
                             {jsonselectorquery},
-                            gen_center_position AS geom,
+                            {geometrycentercolumn} AS geom,
                             ST_XMax(bounds.geom) - ST_XMin(bounds.geom) AS tile_width  -- ← carry it through
                         FROM {tableName}, bounds
                         WHERE ST_Intersects(
-                            gen_center_position,
+                            {geometrycentercolumn},
                             bounds.geom
                         ){sourcequery}{tagquery}{idlistquery}{additionalwhereclause}
                     ),
@@ -344,7 +384,7 @@ public class VectorTileService : IVectorTileService
                             id,
                             {jsonselectorquery},
                             ST_Simplify(
-                                geo,
+                                {geometrycolumn},
                                 CASE
                                     WHEN @zoom < 14 THEN 0.0001
                                     WHEN @zoom < 16 THEN 0.00005
@@ -397,10 +437,10 @@ public class VectorTileService : IVectorTileService
                     SELECT
                         id,
                         {jsonselectorquery},
-                        ST_Transform({geocolumn}, 3857) AS geom
+                        ST_Transform({geometrycolumn ?? geometrycentercolumn}, 3857) AS geom
                     FROM {tableName}, bounds
                     WHERE ST_Intersects(
-                        ST_Transform({geocolumn}, 3857),
+                        ST_Transform({geometrycolumn ?? geometrycentercolumn}, 3857),
                         bounds.geom
                     ){sourcequery}{tagquery}{idlistquery}{additionalwhereclause}
                 ),
@@ -453,8 +493,7 @@ public class VectorTileService : IVectorTileService
                 FROM mvtgeom
                 WHERE geom IS NOT NULL;"
                 ;
-        }
-      
+        }      
     }
 
     /// <summary>
@@ -475,24 +514,7 @@ public class VectorTileService : IVectorTileService
         return (xmin, ymin, xmax, ymax);
     }
 
-    private static string CreateSourceFitler(string source, string tableName)
-    {
-        var sourcequery = source != null 
-                ? $@" AND gen_source = @source"
-                : "";
-
-        //Special Case geoshape
-        if(tableName == "geoshapes")
-        {            
-            sourcequery = source != null 
-                        ? $@" AND source = @source"
-                        : "";            
-        }
-
-        return sourcequery;
-    }
-
-    private static string CreateSourceFilter(string source, string tableName, out Dictionary<string, object> parameters)
+    private static string CreateSourceFilter(string source, string type, out Dictionary<string, object> parameters)
     {
         parameters = new Dictionary<string, object>();
         
@@ -501,7 +523,10 @@ public class VectorTileService : IVectorTileService
             return "";
         }
 
-        var columnName = tableName == "geoshapes" ? "source" : "gen_source";
+        var columnName = type == "geoshape" ? "source" : "gen_source";
+        if(type == "timeseries")
+            columnName = "origin";
+
         var sources = source.Split(',')
                             .Select(s => s.Trim())
                             .Where(s => !string.IsNullOrEmpty(s))
@@ -531,9 +556,15 @@ public class VectorTileService : IVectorTileService
         return $" AND {columnName} IN ({string.Join(", ", paramNames)})";
     }
 
-    private static string CreateIdFilter(List<string> idlist, string tableName, out Dictionary<string, object> parameters)
+    private static string CreateIdFilter(List<string> idlist, string type, out Dictionary<string, object> parameters)
     {
         parameters = new Dictionary<string, object>();
+        string columnName = "id";
+
+        if (type == "timeseries")
+        {
+            //TODO
+        }
         
         if (idlist == null || idlist.Count == 0)
         {
@@ -544,7 +575,7 @@ public class VectorTileService : IVectorTileService
         {
             // Single source - use equality
             parameters["id"] = idlist[0];
-            return $" AND id = @id";
+            return $" AND {columnName} = @id";
         }
         
         // Multiple sources - use IN clause
@@ -556,10 +587,10 @@ public class VectorTileService : IVectorTileService
             paramNames.Add($"@{paramName}");
         }
         
-        return $" AND id IN ({string.Join(", ", paramNames)})";
+        return $" AND {columnName} IN ({string.Join(", ", paramNames)})";
     }
 
-    private static string CreateTagFilter(string tags, string tableName, out Dictionary<string, object> parameters)
+    private static string CreateTagFilter(string tags, string type, out Dictionary<string, object> parameters)
     {
         parameters = new Dictionary<string, object>();
 
@@ -578,7 +609,7 @@ public class VectorTileService : IVectorTileService
             return "";
         }
 
-        if (tableName == "geoshapes")
+        if (type == "geoshape")
         {
             if (tagarray.Length == 1)
             {
@@ -613,10 +644,18 @@ public class VectorTileService : IVectorTileService
         }
     }
 
-    private static (string, string) CreateJsonBSelector(string jsonselector)
+    private static (string, string) CreateJsonBSelector(string type, string jsonselector)    
     {
+        var jsonselectordefault = ("gen_shortname as data","MIN(data)");
+        if(type == "geoshapes")
+            jsonselectordefault = ("name","MIN(name)");
+        else if (type == "timeseries")
+        {
+            //TODO
+        }    
+
         if (jsonselector == null)
-            return ("gen_shortname as data","MIN(data)");
+            return jsonselectordefault;
 
         var parts = jsonselector.Split(',');
 
@@ -634,5 +673,32 @@ public class VectorTileService : IVectorTileService
         var selectquery = $@" jsonb_strip_nulls(jsonb_build_object({string.Join(", ", jsonBuildParts)})) AS data";
 
         return (selectquery, "jsonb_agg(data)->0");
+    }
+
+    private static (bool, bool, bool, int) CheckOperationMode(AllowedOperationMode operationmode, bool enableclustering, int displaytracksonzoomlevel)
+    {
+        bool clusterpoints = enableclustering;
+        int showtracksatzoomlevel = 12;
+        bool showpoints = false;
+        bool showtracks = false;
+
+        switch (operationmode)
+        {
+            case AllowedOperationMode.points:
+                showpoints = true;                
+                break;
+            case AllowedOperationMode.tracks:
+                showtracks = true;
+                break;
+            case AllowedOperationMode.pointsandtracks:
+                showpoints = true;
+                showtracks = true;
+                showtracksatzoomlevel = displaytracksonzoomlevel;
+                break;
+            default:
+                throw new ArgumentOutOfRangeException();
+        }
+
+        return (clusterpoints, showpoints, showtracks, showtracksatzoomlevel);
     }
 }

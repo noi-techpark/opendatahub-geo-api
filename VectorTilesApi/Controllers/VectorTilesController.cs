@@ -15,14 +15,12 @@ public class VectorTilesController : ControllerBase
 {
     private readonly IVectorTileService _vectorTileService;
     private readonly ILogger<VectorTilesController> _logger;    
-    private List<string> _allowedGeoColumns;
     private List<string> _allowedJsonSelectors;
 
     public VectorTilesController(IVectorTileService vectorTileService, ILogger<VectorTilesController> logger)
     {
         _vectorTileService = vectorTileService;
         _logger = logger;
-        _allowedGeoColumns = new List<string>() { "geo", "gen_position", "geometry", "gen_center_position" };
         _allowedJsonSelectors = new List<string>() { "Shortname", "Source", "Active", "Detail.de.Title", "Detail.de.BaseText" };
     }
 
@@ -50,20 +48,19 @@ public class VectorTilesController : ControllerBase
         string? source = null,
         string? tagfilter = null,
         string? jsonselector = null,
-        string? geocolumn = null,
-        bool cluster = true)
+        AllowedOperationMode operationmode = AllowedOperationMode.points,  //points,tracks,pointsandtracks
+        int displaytracksonzoomlevel = 12,
+        bool enableclustering = true
+        )
     {
         try
         {
-            if (geocolumn == null)
-                geocolumn = TranslateTypeString2GeoColumn(type);
-
             //Validate passed parameters
-            var (isValid, errorMessage) = ValidateParamters(type, z, x, y, source, jsonselector, geocolumn);
+            var (isValid, errorMessage) = ValidateParamters(type, z, x, y, source, jsonselector);
             if (!isValid)
                 return BadRequest(errorMessage);
 
-            var tile = await _vectorTileService.GetVectorTileAsync(TranslateTypeString2Table(type), type, z, x, y, source, tagfilter, jsonselector, geocolumn, !String.IsNullOrEmpty(idlist) ? idlist.Split(",").ToList() : null, cluster);
+            var tile = await GetVectorTilesFromService(type, z, x, y, !String.IsNullOrEmpty(idlist) ? idlist.Split(",").ToList() : null, source, tagfilter, jsonselector, operationmode, displaytracksonzoomlevel, enableclustering);
 
             if (tile == null || tile.Length == 0)
             {
@@ -103,21 +100,19 @@ public class VectorTilesController : ControllerBase
         string? source = null,
         string? tagfilter = null,
         string? jsonselector = null,
-        string? geocolumn = null,
-        bool cluster = true
+        AllowedOperationMode operationmode = AllowedOperationMode.points,  //points,tracks,pointsandtracks
+        int displaytracksonzoomlevel = 12,
+        bool enableclustering = true
         )
     {
         try
         {
-            if (geocolumn == null)
-                geocolumn = TranslateTypeString2GeoColumn(type);
-
             //Validate passed parameters
-            var (isValid, errorMessage) = ValidateParamters(type, z, x, y, source, jsonselector, geocolumn);
+            var (isValid, errorMessage) = ValidateParamters(type, z, x, y, source, jsonselector);
             if (!isValid)
                 return BadRequest(errorMessage);
 
-            var tile = await _vectorTileService.GetVectorTileAsync(TranslateTypeString2Table(type), type, z, x, y, source, tagfilter, jsonselector, geocolumn, idlist, cluster);
+            var tile = await GetVectorTilesFromService(type, z, x, y, idlist, source, tagfilter, jsonselector, operationmode, displaytracksonzoomlevel, enableclustering);
 
             if (tile == null || tile.Length == 0)
             {
@@ -136,6 +131,37 @@ public class VectorTilesController : ControllerBase
         }
     }
     
+    private async Task<byte[]> GetVectorTilesFromService(
+        string type,
+        int z,
+        int x,
+        int y,
+        List<string>? idlist,
+        string? source = null,
+        string? tagfilter = null,
+        string? jsonselector = null,
+        AllowedOperationMode operationmode = AllowedOperationMode.points,
+        int displaytracksonzoomlevel = 12,
+        bool clusterpoints = true
+    )
+    {
+        var (geometry_column, geometry_center_column) = TranslateTypeString2GeoColumns(type);
+
+        return await _vectorTileService.GetVectorTileAsync(
+            TranslateTypeString2Table(type), 
+            type, 
+            z, x, y, 
+            source, 
+            tagfilter, 
+            jsonselector, 
+            geometry_column, 
+            geometry_center_column, 
+            idlist, 
+            clusterpoints, 
+            operationmode, 
+            displaytracksonzoomlevel);
+    }
+
     /// <summary>
     /// Health check endpoint
     /// </summary>
@@ -151,8 +177,7 @@ public class VectorTilesController : ControllerBase
         int x,
         int y,
         string? source,
-        string? jsonselector,
-        string geocolumn
+        string? jsonselector
     )
     {
         // Validate tile coordinates
@@ -170,8 +195,8 @@ public class VectorTilesController : ControllerBase
 
         TranslateTypeString2Table(type);
 
-        if (!String.IsNullOrEmpty(geocolumn) && !_allowedGeoColumns.Contains(geocolumn))
-            return (false, "Invalid geo column");
+        // if (!String.IsNullOrEmpty(geocolumn) && !_allowedGeoColumns.Contains(geocolumn))
+        //     return (false, "Invalid geo column");
 
         if (!String.IsNullOrEmpty(jsonselector) && !jsonselector.Split(',').Select(x => x.Trim()).All(x => _allowedJsonSelectors.Contains(x)))
             return (false, "Invalid json selector");
@@ -222,22 +247,29 @@ public class VectorTilesController : ControllerBase
             "announcement" => "announcements",
             "urbangreen" => "urbangreens",
             "spatialdata" => "spatialdatas",
+            "timeseries" => "timeseries",
             _ => throw new Exception("not known type"),
         };
     }
 
-    public static string TranslateTypeString2GeoColumn(string odhtype)
+    public static (string?,string) TranslateTypeString2GeoColumns(string odhtype)
     {
         return odhtype switch
         {
-            "geoshape" => "geometry",
-            "geodata" => "geo",
-            "announcement" => "geo",
-            "urbangreen" => "geo",
-            "spatialdata" => "geo",
-            _ => "gen_position",
+            "timeseries" => (null,"pointprojection"),
+            "geoshape" => ("geometry4326","gen_center_position"),
+            "spatialdata" => ("geo","gen_center_position"),
+            "announcement" => ("geo","gen_center_position"),
+            "urbangreen" => ("geo","gen_center_position"),
+            _ => (null,"gen_position"),
         };
     }
+
+    public static bool CheckOperationModeOnType(string type, AllowedOperationMode operationMode, string? geometrycolumn, string geometrycentercolumn)
+    {
+        return true;
+    }
+
 
     // Helper method to add CORS headers explicitly
     // private void AddCorsHeaders()
