@@ -97,6 +97,11 @@ The API will start at `http://localhost:5023`.
 
 ### API Endpoints
 
+#### Health Check
+```
+GET /api/tiles/health
+```
+
 #### Get Vector Tile
 ```
 GET /api/tiles/{tableName}/{z}/{x}/{y}.pbf
@@ -105,7 +110,11 @@ GET /api/tiles/{tableName}/{z}/{x}/{y}.pbf
 Currently the Open Data Hub Content Api is fully supported
 
 Parameters:
-- `type`: Name of the Open Data Hub data type (_Meta.Type)
+- `type`: Name of the Open Data Hub data type (_Meta.Type) 
+
+Supported types are (`accommodation`,`odhactivitypoi`,`event`,`spatialdata`,`geoshape`)
+Suppor for type (`timeseries`) currently wip
+
 - `z`: Zoom level (0-22)
 - `x`: Tile X coordinate
 - `y`: Tile Y coordinate
@@ -114,7 +123,6 @@ Optional Parameters
 - `idlist`: Separator "," pass Ids to filter on
 - `source`: Separator "," Filter by one or more sources
 - `tagfilter`: Separator "," see Open data hub Content Api tagfilter logic
-- `geocolumn`: Define column where geoinfo is stored (standard is taken), needed if more geo columns are available on an object (Example geo column with center_postion, geo column with points,polygons etc...)
 - `jsonselector`: Include more data into the Vector Tiles (by standard Id and where possible a name is included)
 
 Example:
@@ -128,10 +136,65 @@ POST /api/tiles/{tableName}/{z}/{x}/{y}.pbf
 
 If the passed IDs are to large for a GET Request they can be passed as POST Body (json string List).
 
-#### Health Check
-```
-GET /api/tiles/health
-```
+### Operation Mode Parameters
+
+#### `operationmode`
+
+**Type:** `string`  
+**Default:** `points`
+
+Controls what geometry is rendered in the vector tile. Accepted values:
+
+| Value | Description |
+|---|---|
+| `points` | Renders points only |
+| `tracks` | Renders tracks only |
+| `pointsandtracks` | Renders both points and tracks |
+
+---
+
+#### `clusterpoints`
+
+**Type:** `bool`  
+**Default:** `true`  
+**Applies to:** `points`, `pointsandtracks`
+
+When `true`, nearby points are clustered into a single circle with a count label at lower zoom levels. Clustering is automatically disabled above zoom level 17, where all points are rendered individually.
+
+---
+
+#### `displaytracksonzoomlevel`
+
+**Type:** `int`  
+**Default:** `12`  
+**Applies to:** `tracks`, `pointsandtracks`
+
+The minimum zoom level at which tracks become visible. Below this zoom level tracks are not rendered regardless of `operationmode`.
+
+Tracks are progressively simplified at lower zoom levels to improve performance:
+
+| Zoom level | Simplification tolerance |
+|---|---|
+| < 14 | 0.0001° (~11m) |
+| 14–15 | 0.00005° (~5m) |
+| ≥ 16 | 0.00001° (~1m) |
+
+---
+
+#### Behaviour Matrix
+
+| `operationmode` | Points rendered | Tracks rendered | Clustering applies |
+|---|---|---|---|
+| `points` | ✅ | ❌ | if `clusterpoints = true` |
+| `tracks` | ❌ | ✅ from `displaytracksonzoomlevel` | ❌ |
+| `pointsandtracks` | ✅ | ✅ from `displaytracksonzoomlevel` | if `clusterpoints = true` |
+
+
+#### Additional Information
+
+If a dataset has mixed geometries (some records have points, other have tracks)
+the points are also rendered.
+
 
 ### Testing with MapLibre/Mapbox html
 

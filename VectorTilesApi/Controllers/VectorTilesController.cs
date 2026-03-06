@@ -269,14 +269,4 @@ public class VectorTilesController : ControllerBase
     {
         return true;
     }
-
-
-    // Helper method to add CORS headers explicitly
-    // private void AddCorsHeaders()
-    // {
-    //     Response.Headers.Append("Access-Control-Allow-Origin", "*");
-    //     Response.Headers.Append("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-    //     Response.Headers.Append("Access-Control-Allow-Headers", "*");
-    //     Response.Headers.Append("Access-Control-Max-Age", "86400");
-    // }
 }
