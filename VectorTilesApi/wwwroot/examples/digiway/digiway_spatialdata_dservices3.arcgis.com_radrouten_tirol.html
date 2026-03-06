@@ -7,20 +7,18 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Digiway Geoshapes Euregio</title>
+    <title>Digiway Geoshapes Provincia TN</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js'></script>
     <link href='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css' rel='stylesheet' />
     <link href='../css/style.css' rel='stylesheet'>
 </head>
 <body>
-    <h1>Digiway Data</h1>
     <div class="debug">
         <strong>🔍 Debug Info</strong><br>
         <div id="info">Loading...</div>
     </div>
     <div id="map"></div>
-        <!-- Include the reusable library -->
     <script src="../js/vector-tile-map.js"></script>
     <script src="../js/config.js"></script>
     
@@ -30,10 +28,10 @@ SPDX-License-Identifier: AGPL-3.0-or-later
             containerId: 'map',
             type: 'spatialdata',
             apiUrl: CONFIG.apiUrl,
-            additional: '?source=euregio.roadnetwork',
+            additional: '?source=dservices3.arcgis.com&tagfilter=radrouten_tirol',
             center: [11.35, 46.5],
             zoom: 10
         });
-    </script>
+    </script>    
 </body>
 </html>
