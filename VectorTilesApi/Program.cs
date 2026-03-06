@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.FileProviders;
 using OpenDataHubVectorTileApi.Services;
 
 // Only load .env file if NOT running in Docker
@@ -66,6 +67,16 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseDefaultFiles();
+app.UseStaticFiles(); 
+app.UseDirectoryBrowser(new DirectoryBrowserOptions
+{
+    FileProvider = new PhysicalFileProvider(
+        Path.Combine(builder.Environment.ContentRootPath, "wwwroot")
+    ),
+    RequestPath = ""
+});
 
 app.MapControllers();
 

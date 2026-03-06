@@ -164,3 +164,5 @@ $RECYCLE.BIN/
 .ionide
 
 VectorTilesApi/.env
+
+VectorTilesApi/Services/OldQuerys.cs

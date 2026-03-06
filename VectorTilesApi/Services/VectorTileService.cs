@@ -9,7 +9,7 @@ namespace OpenDataHubVectorTileApi.Services;
 
 public class VectorTileService : IVectorTileService
 {
-    private readonly string _connectionString;
+    private readonly string _connectionString;    
     private readonly ILogger<VectorTileService> _logger;
 
     public VectorTileService(IConfiguration configuration, ILogger<VectorTileService> logger)
@@ -22,7 +22,7 @@ public class VectorTileService : IVectorTileService
         _logger = logger;        
         _logger.LogInformation("Database connection configured for host: {Host}", 
             new Npgsql.NpgsqlConnectionStringBuilder(_connectionString).Host);
-    }
+    }    
 
     public async Task<byte[]> GetVectorTileAsync(
         string tableName, 

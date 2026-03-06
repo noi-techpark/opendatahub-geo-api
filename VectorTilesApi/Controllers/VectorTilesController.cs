@@ -33,9 +33,11 @@ public class VectorTilesController : ControllerBase
     /// <param name="y">Tile Y coordinate</param>
     /// <param name="idlist">Filter by a List of Ids</param>
     /// <param name="source">Source Filter</param>
-    /// <param name="geocolumn">Define column where geoinfo is stored (standard is taken), needed if more geo columns are available on an object (Example geo column with center_postion, geo column with points,polygons etc...)</param>
     /// <param name="tagfilter">Filter by Tags Separator "," see Open data hub Content Api tagfilter logic</param>
-    /// <param name="jsonselector">Include More data (by standard Id and where possible a name is included in the Vector Tiles)</param>    
+    /// <param name="jsonselector">Include More data (by standard Id and where possible a name is included in the Vector Tiles)</param>
+    /// <param name="operationmode">points --> Display only points, tracks --> Display tracks only, --> pointsandtracks --> Display points and tracks (Default: points)</param>
+    /// <param name="displaytracksonzoomlevel">zoom level when tracks are shown (default 12). Please use with caution service can be slow if zoom levels < 11 are used</param>
+    /// <param name="enableclustering">Enable Clustering on Points, defaul: true</param>
     /// <returns>Vector tile in protobuf format</returns>
     [HttpGet("{type}/{z}/{x}/{y}.pbf")]
     [Produces("application/x-protobuf")]
@@ -82,12 +84,17 @@ public class VectorTilesController : ControllerBase
     /// <summary>
     /// Post a vector tile in Mapbox Vector Tile (MVT/protobuf) format
     /// </summary>
-    /// <param name="type">Name of the Open Data Hub Data type</param>
+    /// <param name="type">Name of the Open Data Hub data type</param>
     /// <param name="z">Zoom level</param>
     /// <param name="x">Tile X coordinate</param>
     /// <param name="y">Tile Y coordinate</param>
-    /// <param name="source">Additional Source Filter</param>
-    /// <param name="geocolumn">Overwrite column with geoinfo (default: geo)</param>
+    /// <param name="idlist">Filter by a List of Ids</param>
+    /// <param name="source">Source Filter</param>
+    /// <param name="tagfilter">Filter by Tags Separator "," see Open data hub Content Api tagfilter logic</param>
+    /// <param name="jsonselector">Include More data (by standard Id and where possible a name is included in the Vector Tiles)</param>
+    /// <param name="operationmode">points --> Display only points, tracks --> Display tracks only, --> pointsandtracks --> Display points and tracks (Default: points)</param>
+    /// <param name="displaytracksonzoomlevel">zoom level when tracks are shown (default 12). Please use with caution service can be slow if zoom levels < 11 are used</param>
+    /// <param name="enableclustering">Enable Clustering on Points, defaul: true</param>
     /// <returns>Vector tile in protobuf format</returns>
     [HttpPost("{type}/{z}/{x}/{y}.pbf")]
     [Produces("application/x-protobuf")]
