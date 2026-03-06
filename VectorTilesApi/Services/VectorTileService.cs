@@ -250,7 +250,7 @@ public class VectorTileService : IVectorTileService
             c.id,
             c.data,
             c.count,
-            ({(clusterpoints ? "(c.count > 1) AND (@zoom <= 17)" : "false")}) AS cluster,
+            ({(clusterpoints ? "(c.count > 1) AND (@zoom <= 16)" : "false")}) AS cluster,
             ST_AsMVTGeom(c.geom, bounds.geom, 4096, 256, true) AS geom
         FROM clustered c, bounds
     )" : @"
