@@ -195,18 +195,6 @@ Tracks are progressively simplified at lower zoom levels to improve performance:
 If a dataset has mixed geometries (some records have points, other have tracks)
 the points are also rendered.
 
-
-### Testing with MapLibre/Mapbox html
-
-```bash
-cd ..
-cd html
-serve -p PORT
-```
-
-The Html file is available on the defined Port, "test-map.html"
-
-
 ### Testing with cURL
 
 ```bash
@@ -236,7 +224,7 @@ curl http://localhost:5023/api/tiles/health
 
 ## How to use the api in a web application
 
-Visit the `examples_html` section.
+Visit the `https://geo.api.opendatahub.testingmachine.eu/examples` section.
 There are various maps with data from Open Data Hub Content Api.
 
 Simply include the `vector-tile-map.js` in a html file  
