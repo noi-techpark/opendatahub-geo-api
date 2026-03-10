@@ -306,13 +306,13 @@ return $@"
 
     SELECT ST_AsMVT(mvtgeom.*, '{type}', 4096, 'geom')
     FROM (
-        SELECT id, data, count, cluster, 'point' AS geom_type, geom
+        SELECT id, data::text, count, cluster, 'point' AS geom_type, geom
         FROM mvtgeom_points
         WHERE geom IS NOT NULL
 
         UNION ALL
 
-        SELECT id, data, null AS count, false AS cluster, 'track' AS geom_type, geom
+        SELECT id, data::text, null AS count, false AS cluster, 'track' AS geom_type, geom
         FROM mvtgeom_tracks
         WHERE geom IS NOT NULL
     ) mvtgeom;";
