@@ -168,6 +168,20 @@ public class VectorTileService : IVectorTileService
         bool showtracks,
         int showtracksatzoomlevel)
     {   
+        if(showpoints && !showtracks)
+            return CreateQueryRawSQLPointsOnly(
+                clusterpoints,
+                tableName,
+                geometrycentercolumn,
+                jsonselectorquery,
+                jsonselectorquerycluster,
+                sourcequery,
+                tagquery,
+                idlistquery,
+                additionalwhereclause,
+                type
+            );
+
         return CreateQueryRawSQLBasedOnParameters(
             showpoints, 
             showtracks, 
@@ -306,16 +320,117 @@ return $@"
 
     SELECT ST_AsMVT(mvtgeom.*, '{type}', 4096, 'geom')
     FROM (
-        SELECT id, data::text, count, cluster, 'point' AS geom_type, geom
-        FROM mvtgeom_points
+        SELECT id, data::text, null AS count, false AS cluster, 'track' AS geom_type, geom
+        FROM mvtgeom_tracks
         WHERE geom IS NOT NULL
 
         UNION ALL
 
-        SELECT id, data::text, null AS count, false AS cluster, 'track' AS geom_type, geom
-        FROM mvtgeom_tracks
-        WHERE geom IS NOT NULL
+         SELECT id, data::text, count, cluster, 'point' AS geom_type, geom
+        FROM mvtgeom_points
+        WHERE geom IS NOT NULL        
     ) mvtgeom;";
+    }
+
+    private static string CreateQueryRawSQLPointsOnly(
+        bool clusterpoints,
+        string tableName,
+        string geometrycentercolumn,
+        string jsonselectorquery,
+        string jsonselectorquerycluster,
+        string sourcequery,
+        string tagquery,
+        string idlistquery,
+        string additionalwhereclause,
+        string type
+    )
+    {
+        // At low zoom levels, cap how many points we scan per tile to avoid
+        // hammering 300k rows. The grid clustering will reduce them anyway,
+        // so fetching more than this adds no visual value.
+        const int lowZoomLimit = 5000;
+        const int midZoomLimit = 10000;
+
+        // At zoom >= 17 there is no point clustering even if clusterpoints=true
+        string clusterFlag = clusterpoints
+            ? "(c.count > 1) AND (@zoom <= 16)"
+            : "false";
+
+        string groupBy = clusterpoints ? "gridcell" : "geom";
+
+        return $@"
+        WITH bounds AS (
+            SELECT
+                ST_Transform(ST_MakeEnvelope(@xmin, @ymin, @xmax, @ymax, 3857), 4326) AS geom
+        ),
+
+        -- Pull only the points that intersect the tile, capped per zoom level
+        -- to avoid full-table scans at low zoom on large datasets
+        points AS (
+            SELECT
+                id,
+                {jsonselectorquery},
+                {geometrycentercolumn} AS geom,
+                ST_XMax(bounds.geom) - ST_XMin(bounds.geom) AS tile_width
+            FROM {tableName}, bounds
+            WHERE ST_Intersects(
+                {geometrycentercolumn},
+                bounds.geom
+            ){sourcequery}{tagquery}{idlistquery}{additionalwhereclause}
+            LIMIT CASE
+                WHEN @zoom < 8  THEN {lowZoomLimit}
+                WHEN @zoom < 12 THEN {midZoomLimit}
+                ELSE NULL  -- no limit at high zoom, tile area is small
+            END
+        ),
+
+        -- Snap each point to a grid cell whose size shrinks as zoom increases.
+        -- All points in the same cell get merged into one cluster marker.
+        grid AS (
+            SELECT
+                *,
+                ST_SnapToGrid(
+                    geom,
+                    tile_width /
+                    CASE
+                        WHEN @zoom < 8  THEN 16
+                        WHEN @zoom < 12 THEN 32
+                        ELSE 64
+                    END
+                ) AS gridcell
+            FROM points
+        ),
+
+        clustered AS (
+            SELECT
+                MIN(id)   AS id,
+                CASE WHEN COUNT(*) = 1
+                    THEN {jsonselectorquerycluster}
+                    ELSE NULL
+                END       AS data,
+                COUNT(*)  AS count,
+                ST_Centroid(ST_Collect(geom)) AS geom
+            FROM grid
+            GROUP BY {groupBy}
+        ),
+
+        mvtgeom AS (
+            SELECT
+                c.id,
+                c.data::text,
+                c.count,
+                ({clusterFlag}) AS cluster,
+                ST_AsMVTGeom(
+                    c.geom,
+                    bounds.geom,
+                    4096, 256, true
+                ) AS geom
+            FROM clustered c, bounds
+            WHERE ST_AsMVTGeom(c.geom, bounds.geom, 4096, 256, true) IS NOT NULL
+        )
+
+        SELECT ST_AsMVT(mvtgeom.*, '{type}', 4096, 'geom')
+        FROM mvtgeom;";
     }
 
 
@@ -403,7 +518,7 @@ return $@"
         
         // Multiple sources - use IN clause
         var paramNames = new List<string>();
-        for (int i = 0; i < idlist.Count - 1; i++)
+        for (int i = 0; i <= idlist.Count - 1; i++)
         {
             var paramName = $"id{i}";
             parameters[paramName] = idlist[i];
