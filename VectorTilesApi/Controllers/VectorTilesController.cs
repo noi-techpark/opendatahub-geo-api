@@ -21,7 +21,16 @@ public class VectorTilesController : ControllerBase
     {
         _vectorTileService = vectorTileService;
         _logger = logger;
-        _allowedJsonSelectors = new List<string>() { "Shortname", "Source", "Active", "Detail.de.Title", "Detail.de.BaseText" };
+        _allowedJsonSelectors = new List<string>() { 
+            "Shortname", 
+            "Source", 
+            "Active", 
+            "Detail", 
+            "ContactInfos",
+            "Mapping",
+            "StartTime",
+            "EndTime"
+             };
     }
 
     /// <summary>
@@ -205,7 +214,10 @@ public class VectorTilesController : ControllerBase
         // if (!String.IsNullOrEmpty(geocolumn) && !_allowedGeoColumns.Contains(geocolumn))
         //     return (false, "Invalid geo column");
 
-        if (!String.IsNullOrEmpty(jsonselector) && !jsonselector.Split(',').Select(x => x.Trim()).All(x => _allowedJsonSelectors.Contains(x)))
+       if (!String.IsNullOrEmpty(jsonselector) && 
+            !jsonselector.Split(',')
+                 .Select(x => x.Trim())
+                 .All(x => _allowedJsonSelectors.Any(allowed => x.StartsWith(allowed, StringComparison.OrdinalIgnoreCase))))
             return (false, "Invalid json selector");
 
         return (true, null);

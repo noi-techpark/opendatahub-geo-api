@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System.Data;
+using System.Text.RegularExpressions;
 using Npgsql;
+
 
 namespace OpenDataHubVectorTileApi.Services;
 
@@ -582,15 +584,46 @@ return $@"
         }
     }
 
-    private static (string, string) CreateJsonBSelector(string type, string jsonselector)    
+    // private static (string, string) CreateJsonBSelector(string type, string jsonselector)    
+    // {
+    //     var jsonselectordefault = ("gen_shortname as data","MIN(data)");
+    //     if(type == "geoshape")
+    //         jsonselectordefault = ("name","MIN(name)");
+    //     else if (type == "timeseries")
+    //     {
+    //         //TODO
+    //     }    
+
+    //     if (jsonselector == null)
+    //         return jsonselectordefault;
+
+    //     var parts = jsonselector.Split(',');
+
+    //     var jsonBuildParts = parts
+    //         .Select(p =>
+    //         {
+    //             var trimmed = p.Trim();
+
+    //             // Detail.de.Title → Detail,de,Title
+    //             var jsonPath = string.Join(",", trimmed.Split('.'));
+
+    //             return $"'{trimmed}', data#>'{{{jsonPath}}}'";
+    //         });
+
+    //     var selectquery = $@" jsonb_strip_nulls(jsonb_build_object({string.Join(", ", jsonBuildParts)})) AS data";
+
+    //     return (selectquery, "jsonb_agg(data)->0");
+    // }
+
+    private static (string, string) CreateJsonBSelector(string type, string jsonselector)
     {
-        var jsonselectordefault = ("gen_shortname as data","MIN(data)");
-        if(type == "geoshape")
-            jsonselectordefault = ("name","MIN(name)");
+        var jsonselectordefault = ("gen_shortname as data", "MIN(data)");
+        if (type == "geoshape")
+            jsonselectordefault = ("name", "MIN(name)");
         else if (type == "timeseries")
         {
             //TODO
-        }    
+        }
 
         if (jsonselector == null)
             return jsonselectordefault;
@@ -601,16 +634,36 @@ return $@"
             .Select(p =>
             {
                 var trimmed = p.Trim();
-
-                // Detail.de.Title → Detail,de,Title
-                var jsonPath = string.Join(",", trimmed.Split('.'));
-
-                return $"'{trimmed}', data#>'{{{jsonPath}}}'";
+                var segments = SplitPath(trimmed).ToList();
+                var cleanName = string.Join(".", segments);          // "Mapping.tirol.mapservices.eu.id"
+                var pgPath    = ToPostgresJsonPath(trimmed);         // data->'Mapping'->'tirol.mapservices.eu'->'id'
+                return $"'{cleanName}', {pgPath}";
             });
 
-        var selectquery = $@" jsonb_strip_nulls(jsonb_build_object({string.Join(", ", jsonBuildParts)})) AS data";
+        var selectquery = $@"jsonb_strip_nulls(jsonb_build_object({string.Join(", ", jsonBuildParts)})) AS data";
 
         return (selectquery, "jsonb_agg(data)->0");
+    }
+
+    /// <summary>
+    /// Splits a field path respecting bracket notation for keys containing dots.
+    /// e.g. "Mapping['tirol.mapservices.eu'].id" or "Mapping.tirol.mapservices.eu.id"
+    /// </summary>
+    private static IEnumerable<string> SplitPath(string field)
+    {
+        return Regex.Matches(field, @"\['([^']+)'\]|([^.\[]+)")
+                    .Select(m => m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Value);
+    }
+
+    /// <summary>
+    /// Converts a field path to a PostgreSQL JSONB path using -> operator.
+    /// e.g. "Detail.de.Title"              → data->'Detail'->'de'->'Title'
+    ///      "Mapping['tirol.mapservices.eu'].id" → data->'Mapping'->'tirol.mapservices.eu'->'id'
+    /// </summary>
+    private static string ToPostgresJsonPath(string field, string jsonColumn = "data")
+    {
+        var segments = SplitPath(field);
+        return segments.Aggregate(jsonColumn, (path, segment) => $"{path}->'{segment}'");
     }
 
     private static (bool, bool, bool, int) CheckOperationMode(AllowedOperationMode operationmode, bool enableclustering, int displaytracksonzoomlevel)
