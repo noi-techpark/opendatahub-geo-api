@@ -231,6 +231,11 @@ public class VectorTileService : IVectorTileService
             {geometrycentercolumn},
             bounds.geom
         ){sourcequery}{tagquery}{idlistquery}{additionalwhereclause}
+        LIMIT CASE
+            WHEN @zoom < 8  THEN 5000
+            WHEN @zoom < 12 THEN 10000
+            ELSE NULL
+        END
     ),
 
     grid AS (
