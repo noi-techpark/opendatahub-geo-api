@@ -65,7 +65,10 @@ app.UseResponseCompression();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(options =>
+    {
+        options.DocumentTitle = "Open Data Hub Vectortiles API";
+    });
 }
 
 app.UseDefaultFiles();
