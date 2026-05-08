@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Cors;
 using OpenDataHubVectorTileApi.Services;
@@ -11,26 +12,21 @@ namespace OpenDataHubVectorTileApi.Controllers;
 [ApiController]
 [EnableCors("AllowAll")]
 [Route("api/tiles")]
-public class VectorTilesController : ControllerBase
+public partial class VectorTilesController : ControllerBase
 {
     private readonly IVectorTileService _vectorTileService;
-    private readonly ILogger<VectorTilesController> _logger;    
-    private List<string> _allowedJsonSelectors;
+    private readonly ILogger<VectorTilesController> _logger;
+
+    [GeneratedRegex(@"^[a-z]+$")]
+    private static partial Regex SafeTypeRegex();
+
+    [GeneratedRegex(@"^(Shortname|Source|Active|Detail|ContactInfos|Mapping|StartTime|EndTime)(\.[A-Za-z0-9_]+|\['[A-Za-z0-9_.]+'\])*$", RegexOptions.IgnoreCase)]
+    private static partial Regex SafeJsonSelectorRegex();
 
     public VectorTilesController(IVectorTileService vectorTileService, ILogger<VectorTilesController> logger)
     {
         _vectorTileService = vectorTileService;
         _logger = logger;
-        _allowedJsonSelectors = new List<string>() { 
-            "Shortname", 
-            "Source", 
-            "Active", 
-            "Detail", 
-            "ContactInfos",
-            "Mapping",
-            "StartTime",
-            "EndTime"
-             };
     }
 
     /// <summary>
@@ -67,7 +63,7 @@ public class VectorTilesController : ControllerBase
         try
         {
             //Validate passed parameters
-            var (isValid, errorMessage) = ValidateParamters(type, z, x, y, source, jsonselector);
+            var (isValid, errorMessage) = ValidateParamters(type, z, x, y, jsonselector);
             if (!isValid)
                 return BadRequest(errorMessage);
 
@@ -124,7 +120,7 @@ public class VectorTilesController : ControllerBase
         try
         {
             //Validate passed parameters
-            var (isValid, errorMessage) = ValidateParamters(type, z, x, y, source, jsonselector);
+            var (isValid, errorMessage) = ValidateParamters(type, z, x, y, jsonselector);
             if (!isValid)
                 return BadRequest(errorMessage);
 
@@ -187,12 +183,11 @@ public class VectorTilesController : ControllerBase
         return Ok(new { status = "healthy", timestamp = DateTime.UtcNow });
     }
 
-    private (bool IsValid, string? ErrorMessage) ValidateParamters(
+    private static (bool IsValid, string? ErrorMessage) ValidateParamters(
         string type,
         int z,
         int x,
         int y,
-        string? source,
         string? jsonselector
     )
     {
@@ -209,15 +204,20 @@ public class VectorTilesController : ControllerBase
             return (false, "Invalid zoom level");
         }
 
+        // Explicit allowlist check — do not rely solely on the switch exception as a security guard
+        if (!SafeTypeRegex().IsMatch(type))
+            return (false, "Invalid type");
+
         TranslateTypeString2Table(type);
 
         // if (!String.IsNullOrEmpty(geocolumn) && !_allowedGeoColumns.Contains(geocolumn))
         //     return (false, "Invalid geo column");
 
-       if (!String.IsNullOrEmpty(jsonselector) && 
+        // Full-value regex check — prevents prefix bypass (e.g. "Detail.x'--" starting with "Detail")
+        if (!string.IsNullOrEmpty(jsonselector) &&
             !jsonselector.Split(',')
                  .Select(x => x.Trim())
-                 .All(x => _allowedJsonSelectors.Any(allowed => x.StartsWith(allowed, StringComparison.OrdinalIgnoreCase))))
+                 .All(x => SafeJsonSelectorRegex().IsMatch(x)))
             return (false, "Invalid json selector");
 
         return (true, null);
@@ -279,7 +279,7 @@ public class VectorTilesController : ControllerBase
             "geoshape" => ("geometry4326","gen_center_position"),
             "spatialdata" => ("geo","gen_center_position"),
             "announcement" => ("geo","gen_center_position"),
-            "urbangreen" => ("geo","gen_center_position"),
+            "urbangreen" => ("geo","gen_center_position"),            
             _ => (null,"gen_position"),
         };
     }

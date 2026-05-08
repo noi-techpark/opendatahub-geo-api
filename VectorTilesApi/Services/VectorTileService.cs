@@ -9,7 +9,7 @@ using Npgsql;
 
 namespace OpenDataHubVectorTileApi.Services;
 
-public class VectorTileService : IVectorTileService
+public partial class VectorTileService : IVectorTileService
 {
     private readonly string _connectionString;    
     private readonly ILogger<VectorTileService> _logger;
@@ -585,7 +585,7 @@ return $@"
                 paramNames.Add($"@{paramName}");
             }
 
-            return $" AND gen_tags @> ARRAY[{string.Join(", ", paramNames)}]";
+            return $" AND gen_tags && ARRAY[{string.Join(", ", paramNames)}]";
         }
     }
 
@@ -624,7 +624,7 @@ return $@"
     {
         var jsonselectordefault = ("gen_shortname as data", "MIN(data)");
         if (type == "geoshape")
-            jsonselectordefault = ("name", "MIN(name)");
+            jsonselectordefault = ("name as data", "MIN(data)");
         else if (type == "timeseries")
         {
             //TODO
@@ -665,31 +665,44 @@ return $@"
     /// e.g. "Detail.de.Title"              → data->'Detail'->'de'->'Title'
     ///      "Mapping['tirol.mapservices.eu'].id" → data->'Mapping'->'tirol.mapservices.eu'->'id'
     /// </summary>
+    [GeneratedRegex(@"^[A-Za-z0-9_.]+$")]
+    private static partial Regex SafeJsonSegmentRegex();
+
     private static string ToPostgresJsonPath(string field, string jsonColumn = "data")
     {
         var segments = SplitPath(field);
-        return segments.Aggregate(jsonColumn, (path, segment) => $"{path}->'{segment}'");
+        return segments.Aggregate(jsonColumn, (path, segment) =>
+        {
+            // Only alphanumeric, underscores, and dots (for bracket-notation keys) are allowed.
+            // Reject anything else to prevent SQL injection via single-quote breakout.
+            if (!SafeJsonSegmentRegex().IsMatch(segment))
+                throw new ArgumentException($"Invalid jsonselector segment: '{segment}'");
+            return $"{path}->'{segment}'";
+        });
     }
 
     private static (bool, bool, bool, int) CheckOperationMode(AllowedOperationMode operationmode, bool enableclustering, int displaytracksonzoomlevel)
     {
         bool clusterpoints = enableclustering;
-        int showtracksatzoomlevel = 12;
         bool showpoints = false;
         bool showtracks = false;
+        int showtracksatzoomlevel;
 
         switch (operationmode)
         {
             case AllowedOperationMode.points:
-                showpoints = true;                
+                showpoints = true;
+                showtracksatzoomlevel = 0;
                 break;
             case AllowedOperationMode.tracks:
                 showtracks = true;
-                showtracksatzoomlevel = displaytracksonzoomlevel;
+                // tracks-only: no point clusters to worry about, show from zoom 0 by default
+                showtracksatzoomlevel = 0;
                 break;
             case AllowedOperationMode.pointsandtracks:
                 showpoints = true;
                 showtracks = true;
+                // combined mode: use caller-supplied threshold to avoid visual clutter at low zoom
                 showtracksatzoomlevel = displaytracksonzoomlevel;
                 break;
             default:

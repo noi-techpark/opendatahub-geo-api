@@ -78,7 +78,6 @@ app.MapControllers();
 
 app.Run();
 
-
 static bool IsRunningInDocker()
 {
     // Method 1: Check for .NET-specific environment variable (set in Dockerfile)
@@ -106,3 +105,6 @@ static bool IsRunningInDocker()
     
     return false;
 }
+
+// Expose Program to the test project via WebApplicationFactory<Program>
+public partial class Program { }

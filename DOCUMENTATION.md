@@ -124,11 +124,11 @@ The response is a binary **Mapbox Vector Tile (protobuf)** file with content-typ
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `source` | string | — | Filter by data source. Comma-separated for multiple values (e.g. `lts,idm`). Maps to `gen_source` column (or `origin` for timeseries, `source` for geoshape). |
-| `tagfilter` | string | — | Filter by tags. Comma-separated; all tags must be present on the record (`gen_tags @> ARRAY[...]`). |
+| `tagfilter` | string | — | Filter by tags. Comma-separated OR logic — records matching **any** of the specified tags are returned (`gen_tags && ARRAY[...]`). |
 | `idlist` | string | — | Comma-separated list of record IDs to include. On POST, sent as a JSON array in the body instead. |
 | `jsonselector` | string | — | Dot-path fields from the `data` JSONB column to include in the tile properties. Comma-separated. See [jsonselector](#jsonselector). |
 | `operationmode` | enum | `points` | Controls what geometry is rendered. See [Operation modes](#operation-modes). |
-| `displaytracksonzoomlevel` | int | `12` | Minimum zoom level at which tracks are shown. Use with caution below zoom 11 — tile generation will be slow. |
+| `displaytracksonzoomlevel` | int | `12` | Minimum zoom level at which tracks are shown in `pointsandtracks` mode. Ignored for `tracks`-only mode (tracks always visible). Use with caution below zoom 11 — tile generation will be slow. |
 | `enableclustering` | bool | `true` | When `true`, nearby points within the same tile grid cell are merged into a single cluster marker. The `cluster` property on the feature is `true` and `count` holds the number of merged points. Clustering is always off at zoom ≥ 17. |
 
 ---
