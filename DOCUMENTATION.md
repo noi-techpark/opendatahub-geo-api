@@ -1,4 +1,10 @@
-# OpenDataHub Geo API Documentation
+<!--
+SPDX-FileCopyrightText: NOI Techpark <digital@noi.bz.it>
+
+SPDX-License-Identifier: CC0-1.0
+-->
+
+# Open Data Hub Geo API Documentation
 
 ## How PostGIS generates vector tiles
 
