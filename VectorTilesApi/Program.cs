@@ -61,15 +61,12 @@ app.UseCors("AllowAll");
 app.UseResponseCompression();
 //app.UseAuthorization();
 
-// Configure the HTTP request pipeline
-if (app.Environment.IsDevelopment())
+// Configure the HTTP request pipeline — Swagger enabled on all environments
+app.UseSwagger();
+app.UseSwaggerUI(options =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(options =>
-    {
-        options.DocumentTitle = "Open Data Hub Vectortiles API";
-    });
-}
+    options.DocumentTitle = "Open Data Hub Vectortiles API";
+});
 
 app.UseDefaultFiles();
 app.UseStaticFiles(); 
