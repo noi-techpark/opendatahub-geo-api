@@ -7,13 +7,14 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 <html>
 <head>
     <meta charset="utf-8">
-    <title>South Tyrol Vector Tiles</title>
+    <title>Skiareas Points and Tracks</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js'></script>
     <link href='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css' rel='stylesheet' />
     <link href='css/style.css' rel='stylesheet'>
 </head>
 <body>
+    <h1>Skiareas Points and Tracks</h1>
     <div class="debug">
         <strong>🔍 Debug Info</strong><br>
         <div id="info">Loading...</div>
@@ -26,9 +27,9 @@ SPDX-License-Identifier: AGPL-3.0-or-later
     <script>
         const myMap = new VectorTileMap({
             containerId: 'map',
-            type: 'skiregion',
+            type: 'skiarea',
             apiUrl: CONFIG.apiUrl,
-            additional: '?source=idm&operationmode=pointsandtracks',
+            additional: '?operationmode=pointsandtracks',
             center: [11.35, 46.5],
             zoom: 10
         });
