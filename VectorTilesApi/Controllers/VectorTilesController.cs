@@ -279,7 +279,9 @@ public partial class VectorTilesController : ControllerBase
             "geoshape" => ("geometry4326","gen_center_position"),
             "spatialdata" => ("geo","gen_center_position"),
             "announcement" => ("geo","gen_center_position"),
-            "urbangreen" => ("geo","gen_center_position"),            
+            "urbangreen" => ("geo","gen_center_position"),
+            "skiarea" => ("geo","gen_position"),
+            "skiregion" => ("geo","gen_position"),
             _ => (null,"gen_position"),
         };
     }
