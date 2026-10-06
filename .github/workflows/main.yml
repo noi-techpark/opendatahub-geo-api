@@ -79,10 +79,12 @@ jobs:
           aws-eks-cluster-name: aws-main-eu-01
           aws-region: eu-west-1
 
+  # Deploy Prod (Kubernetes / EKS)
   deploy-prod-api:
-    runs-on: ubuntu-22.04
-    if: github.ref == 'refs/heads/prod'    
+    runs-on: ubuntu-24.04
+    if: github.ref == 'refs/heads/prod'
     needs: test
+    environment: prod
     concurrency: deploy-prod-api
     steps:
       - name: Checkout source code
@@ -90,18 +92,7 @@ jobs:
         with:
           submodules: true
 
-      - name: Create .env file
-        uses: noi-techpark/github-actions/env-file@v2
-        env:
-          X_COMPOSE_PROJECT_NAME: ${{ env.PROJECT_NAME }}
-          X_DOCKER_IMAGE: ${{ env.DOCKER_IMAGE }}
-          X_DOCKER_TAG: ${{ env.DOCKER_TAG }}
-          X_SERVER_PORT: 1028
-
-          X_ASPNETCORE_ENVIRONMENT: "Production"
-          X_PG_CONNECTION: ${{ secrets.PG_CONNECTION_PROD }}
-
-      - name: Build and push 
+      - name: Build and push
         uses: noi-techpark/github-actions/docker-build-and-push@v2
         with:
           docker-username: ${{ github.actor }}
@@ -109,11 +100,32 @@ jobs:
           working-directory: VectorTilesApi
           docker-compose-file: docker-compose.yml
 
-      - name: Deploy application
-        uses: noi-techpark/github-actions/docker-deploy@v2
+      # https://github.com/shrink/actions-docker-registry-tag
+      - name: Add a "latest" docker tag
+        uses: shrink/actions-docker-registry-tag@v4
         with:
-          hosts: 'prod'
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-          docker-username: 'noi-techpark-bot'
-          docker-password: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-          project-name: ${{ env.PROJECT_NAME }}
+          registry: ghcr.io
+          repository: ${{ github.repository }}/${{ github.event.repository.name }}
+          target: ${{ env.DOCKER_TAG }}
+          tags: |
+            latest
+
+      - name: Customize geo-api-prod.yaml
+        run: |
+          yq -i '.image.repository="${{ env.DOCKER_IMAGE }}"' infrastructure/helm/geo-api-prod.yaml
+          yq -i '.image.tag="${{ env.DOCKER_TAG }}"' infrastructure/helm/geo-api-prod.yaml
+          yq -i '.image.pullPolicy="IfNotPresent"' infrastructure/helm/geo-api-prod.yaml
+
+          yq -i '.envSecret.ASPNETCORE_PG_CONNECTION="${{ secrets.PG_CONNECTION_PROD }}"' infrastructure/helm/geo-api-prod.yaml
+
+      - name: Deploy on cluster
+        uses: noi-techpark/github-actions/helm-deploy@v3
+        with:
+          k8s-name: geo-api
+          k8s-namespace: core
+          chart-path: infrastructure/helm/geo-api
+          values-file: infrastructure/helm/geo-api-prod.yaml
+          aws-access-key-id: ${{ secrets[vars.AWS_KEY_ID] }}
+          aws-secret-access-key: ${{ secrets[vars.AWS_KEY_SECRET] }}
+          aws-eks-cluster-name: aws-main-eu-01
+          aws-region: eu-west-1
