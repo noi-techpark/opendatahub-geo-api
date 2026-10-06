@@ -1,0 +1,50 @@
+# Test environment values for the geo-api chart.
+#
+# Non-secret configuration lives here (committed). Sensitive values are listed under
+# `envSecret` with empty placeholders and are filled in at deploy time by the GitHub
+# Actions workflow (yq) from repository secrets, then rendered into a K8s Secret.
+#
+# image.repository / image.tag / image.pullPolicy are also overwritten by the workflow.
+
+image:
+  repository: ghcr.io/noi-techpark/opendatahub-geo-api/opendatahub-geo-api
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+imagePullSecrets:
+  - name: container-registry-r
+
+replicaCount: 1
+
+# Memory request == limit so the pod is protected from node-pressure eviction.
+# Tune to actual usage — raise the limit if you observe OOMKills under load.
+resources:
+  requests:
+    cpu: 50m
+    memory: 1Gi
+  limits:
+    memory: 1Gi
+
+service:
+  type: ClusterIP
+  port: 80
+  targetport: http
+  containerport: 80
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: geo.api.opendatahub.testingmachine.eu
+      paths:
+        - path: "/"
+          pathType: Prefix
+
+# Non-secret environment (mirrors infrastructure/docker-compose.run.yml).
+env:
+  ASPNETCORE_URLS: "http://+:80"
+  ASPNETCORE_ENVIRONMENT: "Development"
+
+# Filled in by the workflow from repository secrets.
+envSecret:
+  ASPNETCORE_PG_CONNECTION: ""
