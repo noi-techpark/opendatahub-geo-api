@@ -40,7 +40,9 @@ public partial class VectorTileService : IVectorTileService
         List<string>? idlist, 
         bool cluster = false,
         AllowedOperationMode operationMode = AllowedOperationMode.points,
-        int displayTracksonZoomLevel = 12
+        int displayTracksonZoomLevel = 12,
+        DateTime? begindate = null,
+        DateTime? enddate = null
         )
     {
         try
@@ -71,6 +73,7 @@ public partial class VectorTileService : IVectorTileService
             //Get the Source query
             var sourcequery = CreateSourceFilter(source, type, out var sourceparameters);
             var tagquery = CreateTagFilter(tagfilter, type, out var tagparameters);
+            additionalwhereclause += CreateEventDateFilter(begindate, enddate, out var dateparameters);
 
             var (clusterpoints, showpoints, showtracks, showtracksatzoomlevel) = CheckOperationMode(operationMode, cluster, displayTracksonZoomLevel);
 
@@ -114,6 +117,10 @@ public partial class VectorTileService : IVectorTileService
             foreach (var tagparam in tagparameters)
             {
                 cmd.Parameters.AddWithValue(tagparam.Key, tagparam.Value);
+            }
+            foreach (var dateparam in dateparameters)
+            {
+                cmd.Parameters.AddWithValue(dateparam.Key, dateparam.Value);
             }
 
             _logger.LogInformation("SQL: {Sql} | Params: {Params}",
@@ -587,6 +594,38 @@ return $@"
 
             return $" AND gen_tags && ARRAY[{string.Join(", ", paramNames)}]";
         }
+    }
+
+    /// <summary>
+    /// Filters Events whose EventDates (gen_eventdates tsmultirange) overlap the requested period.
+    /// An enddate without time component includes the whole day.
+    /// </summary>
+    private static string CreateEventDateFilter(DateTime? begindate, DateTime? enddate, out Dictionary<string, object> parameters)
+    {
+        parameters = new Dictionary<string, object>();
+
+        if (begindate == null && enddate == null)
+        {
+            return "";
+        }
+
+        var lower = "NULL";
+        var upper = "NULL";
+
+        if (begindate != null)
+        {
+            parameters["begindate"] = DateTime.SpecifyKind(begindate.Value, DateTimeKind.Unspecified);
+            lower = "@begindate::timestamp";
+        }
+
+        if (enddate != null)
+        {
+            var end = enddate.Value.TimeOfDay == TimeSpan.Zero ? enddate.Value.AddDays(1) : enddate.Value;
+            parameters["enddate"] = DateTime.SpecifyKind(end, DateTimeKind.Unspecified);
+            upper = "@enddate::timestamp";
+        }
+
+        return $" AND gen_eventdates && tsrange({lower}, {upper}, '[)')";
     }
 
     // private static (string, string) CreateJsonBSelector(string type, string jsonselector)    

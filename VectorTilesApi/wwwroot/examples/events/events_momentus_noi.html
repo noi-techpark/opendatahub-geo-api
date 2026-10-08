@@ -29,7 +29,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
             containerId: 'map',
             type: 'event',
             apiUrl: CONFIG.apiUrl,
-            additional: '?source=momentus,noi&enableclustering=true',
+            additional: '?source=momentus,noi&enableclustering=true&begindate=' + new Date().toISOString().slice(0, 10),
             center: [11.35, 46.5],
             zoom: CONFIG.defaultZoom
         });

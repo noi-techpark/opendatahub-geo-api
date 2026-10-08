@@ -43,6 +43,8 @@ public partial class VectorTilesController : ControllerBase
     /// <param name="operationmode">points --> Display only points, tracks --> Display tracks only, --> pointsandtracks --> Display points and tracks (Default: points)</param>
     /// <param name="displaytracksonzoomlevel">zoom level when tracks are shown (default 12). Please use with caution service can be slow if zoom levels < 11 are used</param>
     /// <param name="enableclustering">Enable Clustering on Points, defaul: true</param>
+    /// <param name="begindate">Only Events taking place on or after this date (yyyy-MM-dd), only supported on type event</param>
+    /// <param name="enddate">Only Events taking place on or before this date (yyyy-MM-dd), only supported on type event</param>
     /// <returns>Vector tile in protobuf format</returns>
     [HttpGet("{type}/{z}/{x}/{y}.pbf")]
     [Produces("application/x-protobuf")]
@@ -57,17 +59,19 @@ public partial class VectorTilesController : ControllerBase
         string? jsonselector = null,
         AllowedOperationMode operationmode = AllowedOperationMode.points,  //points,tracks,pointsandtracks
         int displaytracksonzoomlevel = 12,
-        bool enableclustering = true
+        bool enableclustering = true,
+        DateTime? begindate = null,
+        DateTime? enddate = null
         )
     {
         try
         {
             //Validate passed parameters
-            var (isValid, errorMessage) = ValidateParamters(type, z, x, y, jsonselector);
+            var (isValid, errorMessage) = ValidateParamters(type, z, x, y, jsonselector, begindate, enddate);
             if (!isValid)
                 return BadRequest(errorMessage);
 
-            var tile = await GetVectorTilesFromService(type, z, x, y, !String.IsNullOrEmpty(idlist) ? idlist.Split(",").ToList() : null, source, tagfilter, jsonselector, operationmode, displaytracksonzoomlevel, enableclustering);
+            var tile = await GetVectorTilesFromService(type, z, x, y, !String.IsNullOrEmpty(idlist) ? idlist.Split(",").ToList() : null, source, tagfilter, jsonselector, operationmode, displaytracksonzoomlevel, enableclustering, begindate, enddate);
 
             if (tile == null || tile.Length == 0)
             {
@@ -100,6 +104,8 @@ public partial class VectorTilesController : ControllerBase
     /// <param name="operationmode">points --> Display only points, tracks --> Display tracks only, --> pointsandtracks --> Display points and tracks (Default: points)</param>
     /// <param name="displaytracksonzoomlevel">zoom level when tracks are shown (default 12). Please use with caution service can be slow if zoom levels < 11 are used</param>
     /// <param name="enableclustering">Enable Clustering on Points, defaul: true</param>
+    /// <param name="begindate">Only Events taking place on or after this date (yyyy-MM-dd), only supported on type event</param>
+    /// <param name="enddate">Only Events taking place on or before this date (yyyy-MM-dd), only supported on type event</param>
     /// <returns>Vector tile in protobuf format</returns>
     [HttpPost("{type}/{z}/{x}/{y}.pbf")]
     [Produces("application/x-protobuf")]
@@ -114,17 +120,19 @@ public partial class VectorTilesController : ControllerBase
         string? jsonselector = null,
         AllowedOperationMode operationmode = AllowedOperationMode.points,  //points,tracks,pointsandtracks
         int displaytracksonzoomlevel = 12,
-        bool enableclustering = true
+        bool enableclustering = true,
+        DateTime? begindate = null,
+        DateTime? enddate = null
         )
     {
         try
         {
             //Validate passed parameters
-            var (isValid, errorMessage) = ValidateParamters(type, z, x, y, jsonselector);
+            var (isValid, errorMessage) = ValidateParamters(type, z, x, y, jsonselector, begindate, enddate);
             if (!isValid)
                 return BadRequest(errorMessage);
 
-            var tile = await GetVectorTilesFromService(type, z, x, y, idlist, source, tagfilter, jsonselector, operationmode, displaytracksonzoomlevel, enableclustering);
+            var tile = await GetVectorTilesFromService(type, z, x, y, idlist, source, tagfilter, jsonselector, operationmode, displaytracksonzoomlevel, enableclustering, begindate, enddate);
 
             if (tile == null || tile.Length == 0)
             {
@@ -154,7 +162,9 @@ public partial class VectorTilesController : ControllerBase
         string? jsonselector = null,
         AllowedOperationMode operationmode = AllowedOperationMode.points,
         int displaytracksonzoomlevel = 12,
-        bool clusterpoints = true
+        bool clusterpoints = true,
+        DateTime? begindate = null,
+        DateTime? enddate = null
     )
     {
         var (geometry_column, geometry_center_column) = TranslateTypeString2GeoColumns(type);
@@ -171,7 +181,9 @@ public partial class VectorTilesController : ControllerBase
             idlist, 
             clusterpoints, 
             operationmode, 
-            displaytracksonzoomlevel);
+            displaytracksonzoomlevel,
+            begindate,
+            enddate);
     }
 
     /// <summary>
@@ -188,7 +200,9 @@ public partial class VectorTilesController : ControllerBase
         int z,
         int x,
         int y,
-        string? jsonselector
+        string? jsonselector,
+        DateTime? begindate,
+        DateTime? enddate
     )
     {
         // Validate tile coordinates
@@ -219,6 +233,13 @@ public partial class VectorTilesController : ControllerBase
                  .Select(x => x.Trim())
                  .All(x => SafeJsonSelectorRegex().IsMatch(x)))
             return (false, "Invalid json selector");
+
+        // Date filter relies on the gen_eventdates column, only available on events
+        if ((begindate != null || enddate != null) && type != "event")
+            return (false, "begindate/enddate are only supported on type event");
+
+        if (begindate != null && enddate != null && begindate > enddate)
+            return (false, "begindate must be before enddate");
 
         return (true, null);
     }

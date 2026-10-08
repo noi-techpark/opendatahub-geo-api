@@ -7,14 +7,14 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Events with Source trevilab and drin</title>
+    <title>Events with Source LTS (all dates)</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js'></script>
     <link href='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css' rel='stylesheet' />
     <link href='../css/style.css' rel='stylesheet'>
 </head>
 <body>
-    <h1>Events with Source trevilab and drin</h1>
+    <h1>Events with Source LTS (all dates)</h1>
     <div class="debug">
         <strong>🔍 Debug Info</strong><br>
         <div id="info">Loading...</div>
@@ -29,7 +29,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
             containerId: 'map',
             type: 'event',
             apiUrl: CONFIG.apiUrl,
-            additional: '?source=trevilab,drin&enableclustering=true&begindate=' + new Date().toISOString().slice(0, 10),
+            additional: '?source=lts&enableclustering=true',
             center: [11.35, 46.5],
             zoom: CONFIG.defaultZoom
         });
