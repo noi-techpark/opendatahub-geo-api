@@ -21,6 +21,8 @@ public interface IVectorTileService
         List<string>? idlist, 
         bool cluster = false,
         AllowedOperationMode operationMode = AllowedOperationMode.points,
-        int displayTracksonZoomLevel = 12
+        int displayTracksonZoomLevel = 12,
+        DateTime? begindate = null,
+        DateTime? enddate = null
         );
 }

@@ -57,6 +57,12 @@ public class ExampleTileTests : IClassFixture<WebApplicationFactory<Program>>
         ["announcements_points",                        $"announcement/{Z}/{X}/{Y}.pbf?operationmode=points"],
         ["announcements_pointsandtracks",               $"announcement/{Z}/{X}/{Y}.pbf?operationmode=pointsandtracks&displaytracksonzoomlevel=8"],
 
+        // ── events ────────────────────────────────────────────────────
+        ["events_lts_all",                              $"event/{Z}/{X}/{Y}.pbf?source=lts&enableclustering=true"],
+        ["events_lts_begindate",                        $"event/{Z}/{X}/{Y}.pbf?source=lts&enableclustering=true&begindate={DateTime.Today:yyyy-MM-dd}"],
+        ["events_lts_begindate_enddate",                $"event/{Z}/{X}/{Y}.pbf?source=lts&begindate={DateTime.Today:yyyy-MM-dd}&enddate={DateTime.Today.AddDays(30):yyyy-MM-dd}"],
+        ["events_momentus_noi_begindate",               $"event/{Z}/{X}/{Y}.pbf?source=momentus,noi&enableclustering=true&begindate={DateTime.Today:yyyy-MM-dd}"],
+
         // ── digiway/spatialdata ────────────────────────────────────────
         ["digiway_spatialdata_civis_geoserver",         $"spatialdata/{Z}/{X}/{Y}.pbf?source=civis.geoserver"],
         ["digiway_spatialdata_civis_cycleways",         $"spatialdata/{Z}/{X}/{Y}.pbf?source=civis.geoserver&tagfilter=cyclewaystyrol&operationmode=pointsandtracks"],
@@ -96,6 +102,20 @@ public class ExampleTileTests : IClassFixture<WebApplicationFactory<Program>>
             var bytes = await response.Content.ReadAsByteArrayAsync();
             Assert.NotEmpty(bytes);
         }
+    }
+
+    [Theory]
+    [InlineData("accommodation/10/544/362.pbf?begindate=2026-01-01")]
+    [InlineData("event/10/544/362.pbf?begindate=2026-02-01&enddate=2026-01-01")]
+    [InlineData("event/10/544/362.pbf?begindate=notadate")]
+    public async Task EventDateFilter_InvalidRequest_ReturnsBadRequest(string path)
+    {
+        var response = await _client.GetAsync($"/api/tiles/{path}");
+        // BadRequest(string) is reported as 406 because of [Produces("application/x-protobuf")]
+        Assert.True(
+            response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.NotAcceptable,
+            $"Expected 400 or 406 but got {(int)response.StatusCode} for /api/tiles/{path}"
+        );
     }
 
     [Fact]

@@ -130,6 +130,8 @@ The response is a binary **Mapbox Vector Tile (protobuf)** file with content-typ
 | `operationmode` | enum | `points` | Controls what geometry is rendered. See [Operation modes](#operation-modes). |
 | `displaytracksonzoomlevel` | int | `12` | Minimum zoom level at which tracks are shown in `pointsandtracks` mode. Ignored for `tracks`-only mode (tracks always visible). Use with caution below zoom 11 — tile generation will be slow. |
 | `enableclustering` | bool | `true` | When `true`, nearby points within the same tile grid cell are merged into a single cluster marker. The `cluster` property on the feature is `true` and `count` holds the number of merged points. Clustering is always off at zoom ≥ 17. |
+| `begindate` | date | — | Only type `event`. Returns events whose event dates overlap the period starting at this date (`gen_eventdates && tsrange(begindate, enddate)`). Format `yyyy-MM-dd` or `yyyy-MM-ddTHH:mm`. |
+| `enddate` | date | — | Only type `event`. Upper bound of the period; a date without time includes the whole day. Can be combined with `begindate` or used alone. |
 
 ---
 
