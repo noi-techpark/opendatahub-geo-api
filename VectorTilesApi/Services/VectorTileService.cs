@@ -274,45 +274,20 @@ public partial class VectorTileService : IVectorTileService
         END
     ),
 
-    grid AS (
-        SELECT
-            *,
-            ST_SnapToGrid(
-                geom,
-                tile_width /
-                CASE
-                    WHEN @zoom < 8  THEN 16
-                    WHEN @zoom < 12 THEN 32
-                    ELSE 64
-                END
-            ) AS gridcell
-        FROM points
-    ),
-
-    clustered AS (
-        SELECT
-            MIN(id) AS id,
-            CASE WHEN COUNT(*) = 1
-                THEN {jsonselectorquerycluster}
-                ELSE NULL
-            END AS data,
-            COUNT(*) AS count,
-            ST_Centroid(ST_Collect(geom)) AS geom
-        FROM grid
-        GROUP BY {(clusterpoints ? "gridcell" : "geom")}
-    ),
+    {CreatePointClusterCtes(clusterpoints, jsonselectorquerycluster)},
 
     mvtgeom_points AS (
         SELECT
             c.id,
             c.data,
             c.count,
-            ({(clusterpoints ? "(c.count > 1) AND (@zoom <= 16)" : "false")}) AS cluster,
+            (c.count > 1) AS cluster,
+            c.members,
             ST_AsMVTGeom(c.geom, bounds.geom, 4096, 256, true) AS geom
         FROM clustered c, bounds
     )" : @"
     mvtgeom_points AS (
-        SELECT null::text AS id, null::text AS data, null::int AS count, false AS cluster, null::geometry AS geom
+        SELECT null::text AS id, null::text AS data, null::int AS count, false AS cluster, null::text AS members, null::geometry AS geom
         WHERE false
     )";
 
@@ -363,13 +338,13 @@ return $@"
 
     SELECT ST_AsMVT(mvtgeom.*, '{type}', 4096, 'geom')
     FROM (
-        SELECT id, data::text, null AS count, false AS cluster, 'track' AS geom_type, geom
+        SELECT id, data::text, null AS count, false AS cluster, null::text AS members, 'track' AS geom_type, geom
         FROM mvtgeom_tracks
         WHERE geom IS NOT NULL
 
         UNION ALL
 
-         SELECT id, data::text, count, cluster, 'point' AS geom_type, geom
+         SELECT id, data::text, count, cluster, members, 'point' AS geom_type, geom
         FROM mvtgeom_points
         WHERE geom IS NOT NULL        
     ) mvtgeom;";
@@ -393,13 +368,6 @@ return $@"
         // so fetching more than this adds no visual value.
         const int lowZoomLimit = 5000;
         const int midZoomLimit = 10000;
-
-        // At zoom >= 17 there is no point clustering even if clusterpoints=true
-        string clusterFlag = clusterpoints
-            ? "(c.count > 1) AND (@zoom <= 16)"
-            : "false";
-
-        string groupBy = clusterpoints ? "gridcell" : "geom";
 
         return $@"
         WITH bounds AS (
@@ -427,42 +395,15 @@ return $@"
             END
         ),
 
-        -- Snap each point to a grid cell whose size shrinks as zoom increases.
-        -- All points in the same cell get merged into one cluster marker.
-        grid AS (
-            SELECT
-                *,
-                ST_SnapToGrid(
-                    geom,
-                    tile_width /
-                    CASE
-                        WHEN @zoom < 8  THEN 16
-                        WHEN @zoom < 12 THEN 32
-                        ELSE 64
-                    END
-                ) AS gridcell
-            FROM points
-        ),
-
-        clustered AS (
-            SELECT
-                MIN(id)   AS id,
-                CASE WHEN COUNT(*) = 1
-                    THEN {jsonselectorquerycluster}
-                    ELSE NULL
-                END       AS data,
-                COUNT(*)  AS count,
-                ST_Centroid(ST_Collect(geom)) AS geom
-            FROM grid
-            GROUP BY {groupBy}
-        ),
+        {CreatePointClusterCtes(clusterpoints, jsonselectorquerycluster)},
 
         mvtgeom AS (
             SELECT
                 c.id,
                 c.data::text,
                 c.count,
-                ({clusterFlag}) AS cluster,
+                (c.count > 1) AS cluster,
+                c.members,
                 ST_AsMVTGeom(
                     c.geom,
                     bounds.geom,
@@ -476,6 +417,84 @@ return $@"
         FROM mvtgeom;";
     }
 
+
+    // Markers closer than this distance (pixels on a 512px tile) overlap on screen and are always merged
+    private const int OverlapPixels = 12;
+
+    // Clusters up to this size carry their members (id, data) so clients can list them
+    private const int MaxClusterMembers = 10;
+
+    /// <summary>
+    /// Creates the clustered CTE from the points CTE (id, data, geom, tile_width).
+    /// Clustering: 1. merge markers overlapping on screen (distance based, not split by grid lines),
+    /// 2. up to zoom 16 merge the resulting groups on a grid whose cell size shrinks with the zoom.
+    /// Without clustering every point is returned on its own.
+    /// </summary>
+    private static string CreatePointClusterCtes(bool clusterpoints, string jsonselectorquerycluster)
+    {
+        if (!clusterpoints)
+        {
+            return @"
+    clustered AS (
+        SELECT id, data, 1::bigint AS count, null::text AS members, geom
+        FROM points
+    )";
+        }
+
+        return $@"
+    overlap AS (
+        SELECT
+            *,
+            ST_ClusterDBSCAN(
+                ST_Transform(geom, 3857),
+                eps := (@xmax - @xmin) / 512.0 * {OverlapPixels},
+                minpoints := 1
+            ) OVER () AS overlapgroup
+        FROM points
+    ),
+
+    overlapcenter AS (
+        SELECT overlapgroup, ST_Centroid(ST_Collect(geom)) AS center
+        FROM overlap
+        GROUP BY overlapgroup
+    ),
+
+    grid AS (
+        SELECT
+            o.*,
+            CASE WHEN @zoom <= 16
+                THEN ST_SnapToGrid(
+                    c.center,
+                    o.tile_width /
+                    CASE
+                        WHEN @zoom < 8  THEN 16
+                        WHEN @zoom < 12 THEN 32
+                        ELSE 64
+                    END
+                )
+                ELSE c.center
+            END AS gridcell
+        FROM overlap o
+        JOIN overlapcenter c USING (overlapgroup)
+    ),
+
+    clustered AS (
+        SELECT
+            MIN(id) AS id,
+            CASE WHEN COUNT(*) = 1
+                THEN {jsonselectorquerycluster}
+                ELSE NULL
+            END AS data,
+            COUNT(*) AS count,
+            CASE WHEN COUNT(*) BETWEEN 2 AND {MaxClusterMembers}
+                THEN jsonb_agg(jsonb_build_object('id', id, 'data', data) ORDER BY id)::text
+                ELSE NULL
+            END AS members,
+            ST_Centroid(ST_Collect(geom)) AS geom
+        FROM grid
+        GROUP BY gridcell
+    )";
+    }
 
     /// <summary>
     /// Calculate Web Mercator bounds for a tile
