@@ -44,14 +44,21 @@ Reduces the number of vertices in a line/polygon based on zoom level. At low zoo
 
 ---
 
-### 4. Cluster points — `ST_SnapToGrid` + `ST_Centroid` + `ST_Collect`
+### 4. Cluster points — `ST_ClusterDBSCAN` + `ST_SnapToGrid` + `ST_Centroid`
 
 ```sql
-ST_SnapToGrid(geom, tile_width / 32)  -- snap nearby points to same grid cell
-ST_Centroid(ST_Collect(geom))         -- merge snapped points into one centroid
+ST_ClusterDBSCAN(ST_Transform(geom, 3857), eps := tile_width_3857 / 512 * 12, minpoints := 1) OVER ()
+                                      -- 1. merge markers overlapping on screen (< 12 px apart)
+ST_SnapToGrid(center, tile_width / 32) -- 2. up to zoom 16: merge those groups on a grid
+ST_Centroid(ST_Collect(geom))          -- place the marker at the center of the group
 ```
 
-Points close together on screen get merged into one cluster marker. `ST_Collect` groups them, `ST_Centroid` places the marker at the center of the group.
+Clustering runs in two steps:
+
+1. Markers closer than 12 px on screen (on a 512 px tile) would overlap, so they are always merged first. This step uses distance, so a grid line can't split two almost identical points into two overlapping markers.
+2. Up to zoom 16, the groups from step 1 are merged further on a grid whose cell size shrinks as the zoom increases. From zoom 17 on, only overlapping markers stay merged.
+
+Points with identical coordinates therefore stay one cluster at every zoom, because zooming in can never separate them. Clusters with up to 10 points carry a `members` property, so clients can list the points instead of zooming in.
 
 ---
 
@@ -129,7 +136,7 @@ The response is a binary **Mapbox Vector Tile (protobuf)** file with content-typ
 | `jsonselector` | string | — | Dot-path fields from the `data` JSONB column to include in the tile properties. Comma-separated. See [jsonselector](#jsonselector). |
 | `operationmode` | enum | `points` | Controls what geometry is rendered. See [Operation modes](#operation-modes). |
 | `displaytracksonzoomlevel` | int | `12` | Minimum zoom level at which tracks are shown in `pointsandtracks` mode. Ignored for `tracks`-only mode (tracks always visible). Use with caution below zoom 11 — tile generation will be slow. |
-| `enableclustering` | bool | `true` | When `true`, nearby points within the same tile grid cell are merged into a single cluster marker. The `cluster` property on the feature is `true` and `count` holds the number of merged points. Clustering is always off at zoom ≥ 17. |
+| `enableclustering` | bool | `true` | When `true`, nearby points are merged into a single cluster marker (see [Cluster points](#4-cluster-points--st_clusterdbscan--st_snaptogrid--st_centroid)). The `cluster` property on the feature is `true` and `count` holds the number of merged points. Clusters of up to 10 points also have `members`, a JSON array of `{id, data}`. From zoom 17 on only overlapping points (< 12 px apart) stay clustered. When `false`, every point is returned on its own, including points with identical coordinates. |
 | `begindate` | date | — | Only type `event`. Returns events whose event dates overlap the period starting at this date (`gen_eventdates && tsrange(begindate, enddate)`). Format `yyyy-MM-dd` or `yyyy-MM-ddTHH:mm`. |
 | `enddate` | date | — | Only type `event`. Upper bound of the period; a date without time includes the whole day. Can be combined with `begindate` or used alone. |
 | `active` | bool / `null` | `true` | Filter by active state (`gen_active = @active`). `active=null` returns active and inactive records (an empty `active=` keeps the default `true`). Silently ignored on types without a `gen_active` column (`tag`, `geoshape`, …). |
@@ -241,5 +248,5 @@ GET /api/tiles/odhactivitypoi/12/2178/1430.pbf
 4. PostGIS filters rows with `ST_Intersects(gen_position, tile_bounds)` using the GiST index.
 5. The `source=lts` filter adds `AND gen_source = 'lts'`.
 6. The `tagfilter=hiking` filter adds `AND gen_tags @> ARRAY['hiking']`.
-7. Points are snapped to a grid, clustered, and encoded as MVT with `Detail.de.Title` included in the feature properties.
+7. Overlapping points are merged, the rest is clustered on a grid, and everything is encoded as MVT with `Detail.de.Title` included in the feature properties.
 8. The binary blob is returned to the map client.

@@ -401,17 +401,58 @@ function VectorTileMap(config) {
     //     });
     // });
 
-    map.on('click', 'clusters', (e) => {
-    const feature = e.features[0];
+    function escapeHtml(value) {
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
 
-    // if (map.getZoom() >= 18) {
-    //     spiderfy(feature);
-    // } else {
+    // Cluster popup listing its members (id + data), sent by the API for clusters up to 10 points
+    function createClusterPopup(feature) {
+        const props = feature.properties;
+        let html = `<strong>${props.count} points at this location</strong>`;
+
+        if (!props.members) {
+            return html + '<br>Too many points to list, filter the data to see them.';
+        }
+
+        html += '<ul style="padding-left:16px;margin:4px 0;max-height:240px;overflow-y:auto;">';
+        JSON.parse(props.members).forEach(member => {
+            html += `<li><strong>ID:</strong> ${escapeHtml(member.id)}`;
+            if (member.data && typeof member.data === 'object') {
+                Object.keys(member.data).forEach(k => {
+                    html += `<br><strong>${escapeHtml(k)}:</strong> ${escapeHtml(member.data[k])}`;
+                });
+            } else if (member.data) {
+                html += `<br>${escapeHtml(member.data)}`;
+            }
+            html += '</li>';
+        });
+        return html + '</ul>';
+    }
+
+    // From this zoom on a cluster with members is listed instead of zooming in,
+    // its points are (almost) at the same location and would not separate anymore
+    const listClusterFromZoom = 16;
+
+    map.on('click', 'clusters', (e) => {
+        const feature = e.features[0];
+        const zoom = map.getZoom();
+
+        if ((feature.properties.members && zoom >= listClusterFromZoom) || zoom >= map.getMaxZoom()) {
+            new maplibregl.Popup()
+                .setLngLat(feature.geometry.coordinates)
+                .setHTML(createClusterPopup(feature))
+                .addTo(map);
+            return;
+        }
+
         map.easeTo({
             center: feature.geometry.coordinates,
-            zoom: map.getZoom() + 2
+            zoom: Math.min(zoom + 2, map.getMaxZoom())
         });
-        //}
     });
 
     //Spiderfy
