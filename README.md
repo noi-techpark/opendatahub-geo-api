@@ -113,7 +113,7 @@ Parameters:
 - `type`: Name of the Open Data Hub data type (_Meta.Type) 
 
 Supported types are (`accommodation`,`odhactivitypoi`,`event`,`spatialdata`,`geoshape`)
-Suppor for type (`timeseries`) currently wip
+Support for type (`timeseries`) currently disabled (wip)
 
 - `z`: Zoom level (0-22)
 - `x`: Tile X coordinate
@@ -124,6 +124,8 @@ Optional Parameters
 - `source`: Separator "," Filter by one or more sources
 - `tagfilter`: Separator "," see Open data hub Content Api tagfilter logic
 - `jsonselector`: Include more data into the Vector Tiles (by standard Id and where possible a name is included)
+- `active`: Filter by active state `true`/`false`, `null` returns active and inactive (default `true`), ignored on types without Active field
+- `publishedon`: Separator "," Filter by publication channel (e.g. `idm-marketplace`), any of the channels matches
 
 Example:
 ```

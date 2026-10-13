@@ -132,6 +132,8 @@ The response is a binary **Mapbox Vector Tile (protobuf)** file with content-typ
 | `enableclustering` | bool | `true` | When `true`, nearby points within the same tile grid cell are merged into a single cluster marker. The `cluster` property on the feature is `true` and `count` holds the number of merged points. Clustering is always off at zoom ≥ 17. |
 | `begindate` | date | — | Only type `event`. Returns events whose event dates overlap the period starting at this date (`gen_eventdates && tsrange(begindate, enddate)`). Format `yyyy-MM-dd` or `yyyy-MM-ddTHH:mm`. |
 | `enddate` | date | — | Only type `event`. Upper bound of the period; a date without time includes the whole day. Can be combined with `begindate` or used alone. |
+| `active` | bool / `null` | `true` | Filter by active state (`gen_active = @active`). `active=null` returns active and inactive records (an empty `active=` keeps the default `true`). Silently ignored on types without a `gen_active` column (`tag`, `geoshape`, …). |
+| `publishedon` | string | — | Filter by publication channel. Comma-separated OR logic — records published on **any** of the given channels are returned (`gen_publishedon && ARRAY[...]`). Returns `400` on types without a `gen_publishedon` column (`announcement`, `urbangreen`, `spatialdata`, `geoshape`, …). |
 
 ---
 
@@ -181,18 +183,15 @@ Each type maps to a PostgreSQL table and a pair of geometry columns.
 | Type | Table | Point column | Track/shape column |
 |------|-------|--------------|--------------------|
 | `accommodation` | `accommodations` | `gen_position` | — |
-| `accommodationroom` | `accommodationrooms` | `gen_position` | — |
-| `ltsactivity` | `activities` | `gen_position` | — |
-| `ltspoi` | `pois` | `gen_position` | — |
+| `accommodationroom` *(not supported)* | `accommodationrooms` | — | — |
 | `event` | `events` | `gen_position` | — |
 | `odhactivitypoi` | `smgpois` | `gen_position` | — |
-| `package` | `packages` | `gen_position` | — |
 | `measuringpoint` | `measuringpoints` | `gen_position` | — |
 | `webcam` | `webcams` | `gen_position` | — |
-| `article` | `articles` | `gen_position` | — |
-| `venue` | `venues_v2` | `gen_position` | — |
-| `eventshort` | `eventeuracnoi` | `gen_position` | — |
-| `experiencearea` | `experienceareas` | `gen_position` | — |
+| `article` *(not supported)* | `articles` | — | — |
+| `venue` | `venues` | `gen_position` | — |
+| `eventshort` *(not supported)* | `eventeuracnoi` | — | — |
+| `experiencearea` *(not supported)* | `experienceareas` | — | — |
 | `metaregion` | `metaregions` | `gen_position` | — |
 | `region` | `regions` | `gen_position` | — |
 | `tourismassociation` | `tvs` | `gen_position` | — |
@@ -200,23 +199,28 @@ Each type maps to a PostgreSQL table and a pair of geometry columns.
 | `district` | `districts` | `gen_position` | — |
 | `skiarea` | `skiareas` | `gen_position` | — |
 | `skiregion` | `skiregions` | `gen_position` | — |
-| `area` | `areas` | `gen_position` | — |
-| `wineaward` | `wines` | `gen_position` | — |
-| `odhtag` | `smgtags` | `gen_position` | — |
-| `publisher` | `publishers` | `gen_position` | — |
-| `source` | `sources` | `gen_position` | — |
-| `weatherhistory` | `weatherdatahistory` | `gen_position` | — |
-| `odhmetadata` | `metadata` | `gen_position` | — |
-| `tag` | `tags` | `gen_position` | — |
+| `area` *(deprecated)* | `areas` | — | — |
+| `wineaward` *(not supported)* | `wines` | — | — |
+| `odhtag` *(deprecated)* | `smgtags` | — | — |
+| `publisher` *(not supported)* | `publishers` | — | — |
+| `source` *(not supported)* | `sources` | — | — |
+| `weatherhistory` *(not supported)* | `weatherdatahistory` | — | — |
+| `odhmetadata` *(not supported)* | `metadata` | — | — |
+| `tag` *(not supported)* | `tags` | — | — |
 | `geoshape` | `geoshapes` | `gen_center_position` | `geometry4326` |
 | `announcement` | `announcements` | `gen_center_position` | `geo` |
 | `urbangreen` | `urbangreens` | `gen_center_position` | `geo` |
 | `spatialdata` | `spatialdatas` | `gen_center_position` | `geo` |
-| `timeseries` | `timeseries` | `pointprojection` | — |
 
-Types with a track/shape column support `operationmode=tracks` and `operationmode=pointsandtracks`. All others only support `operationmode=points`.
+Types with a track/shape column support `operationmode=tracks` and `operationmode=pointsandtracks`. All others only support `operationmode=points`; requesting tracks on them returns `400`.
 
-Most types also enforce `gen_access_role @> ARRAY['ANONYMOUS']` — the exceptions are `geoshapes`, `spatialdatas`, and `timeseries`.
+The deprecated types `odhtag` and `area` return `400` with the message `type <type> is deprecated`.
+
+Types without geometry (`accommodationroom`, `article`, `eventshort`, `experiencearea`, `wineaward`, `publisher`, `source`, `weatherhistory`, `odhmetadata`, `tag`) return `400` with the message `type <type> is not supported`.
+
+Most types also enforce `gen_access_role @> ARRAY['ANONYMOUS']` — the exceptions are `geoshapes` and `spatialdatas`.
+
+By default only active records are returned (`active=true`) on all types having a `gen_active` column, including `spatialdatas`.
 
 ---
 

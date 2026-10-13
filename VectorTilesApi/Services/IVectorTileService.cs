@@ -23,6 +23,8 @@ public interface IVectorTileService
         AllowedOperationMode operationMode = AllowedOperationMode.points,
         int displayTracksonZoomLevel = 12,
         DateTime? begindate = null,
-        DateTime? enddate = null
+        DateTime? enddate = null,
+        bool? active = true,
+        string? publishedon = null
         );
 }

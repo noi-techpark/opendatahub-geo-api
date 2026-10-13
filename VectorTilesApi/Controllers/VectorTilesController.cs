@@ -17,6 +17,16 @@ public partial class VectorTilesController : ControllerBase
     private readonly IVectorTileService _vectorTileService;
     private readonly ILogger<VectorTilesController> _logger;
 
+    // Types no longer supported, requests are rejected with a deprecation message
+    private static readonly HashSet<string> DeprecatedTypes = ["odhtag", "area"];
+
+    // Types without geometry (no gen_position column), no vector tiles can be generated
+    private static readonly HashSet<string> UnsupportedTypes =
+    [
+        "accommodationroom", "article", "eventshort", "experiencearea", "wineaward",
+        "publisher", "source", "weatherhistory", "odhmetadata", "tag"
+    ];
+
     [GeneratedRegex(@"^[a-z]+$")]
     private static partial Regex SafeTypeRegex();
 
@@ -45,9 +55,13 @@ public partial class VectorTilesController : ControllerBase
     /// <param name="enableclustering">Enable Clustering on Points, defaul: true</param>
     /// <param name="begindate">Only Events taking place on or after this date (yyyy-MM-dd), only supported on type event</param>
     /// <param name="enddate">Only Events taking place on or before this date (yyyy-MM-dd), only supported on type event</param>
+    /// <param name="active">Filter by Active state: true, false or null (active and inactive) (default: true), ignored on types without Active field</param>
+    /// <param name="publishedon">Filter by PublishedOn channels Separator "," (e.g. idm-marketplace), any of the channels matches</param>
     /// <returns>Vector tile in protobuf format</returns>
     [HttpGet("{type}/{z}/{x}/{y}.pbf")]
-    [Produces("application/x-protobuf")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK, "application/x-protobuf")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetVectorTile(
         string type,
         int z,
@@ -61,17 +75,22 @@ public partial class VectorTilesController : ControllerBase
         int displaytracksonzoomlevel = 12,
         bool enableclustering = true,
         DateTime? begindate = null,
-        DateTime? enddate = null
+        DateTime? enddate = null,
+        string? active = "true",
+        string? publishedon = null
         )
     {
         try
         {
             //Validate passed parameters
-            var (isValid, errorMessage) = ValidateParamters(type, z, x, y, jsonselector, begindate, enddate);
+            var (isValid, errorMessage) = ValidateParamters(type, z, x, y, jsonselector, operationmode, begindate, enddate, publishedon);
             if (!isValid)
                 return BadRequest(errorMessage);
 
-            var tile = await GetVectorTilesFromService(type, z, x, y, !String.IsNullOrEmpty(idlist) ? idlist.Split(",").ToList() : null, source, tagfilter, jsonselector, operationmode, displaytracksonzoomlevel, enableclustering, begindate, enddate);
+            if (!TryParseActive(active, out var activefilter))
+                return BadRequest("active must be true, false or null");
+
+            var tile = await GetVectorTilesFromService(type, z, x, y, !String.IsNullOrEmpty(idlist) ? idlist.Split(",").ToList() : null, source, tagfilter, jsonselector, operationmode, displaytracksonzoomlevel, enableclustering, begindate, enddate, activefilter, publishedon);
 
             if (tile == null || tile.Length == 0)
             {
@@ -106,9 +125,13 @@ public partial class VectorTilesController : ControllerBase
     /// <param name="enableclustering">Enable Clustering on Points, defaul: true</param>
     /// <param name="begindate">Only Events taking place on or after this date (yyyy-MM-dd), only supported on type event</param>
     /// <param name="enddate">Only Events taking place on or before this date (yyyy-MM-dd), only supported on type event</param>
+    /// <param name="active">Filter by Active state: true, false or null (active and inactive) (default: true), ignored on types without Active field</param>
+    /// <param name="publishedon">Filter by PublishedOn channels Separator "," (e.g. idm-marketplace), any of the channels matches</param>
     /// <returns>Vector tile in protobuf format</returns>
     [HttpPost("{type}/{z}/{x}/{y}.pbf")]
-    [Produces("application/x-protobuf")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK, "application/x-protobuf")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> PostVectorTile(
         [FromBody] List<string> idlist,
         string type,
@@ -122,17 +145,22 @@ public partial class VectorTilesController : ControllerBase
         int displaytracksonzoomlevel = 12,
         bool enableclustering = true,
         DateTime? begindate = null,
-        DateTime? enddate = null
+        DateTime? enddate = null,
+        string? active = "true",
+        string? publishedon = null
         )
     {
         try
         {
             //Validate passed parameters
-            var (isValid, errorMessage) = ValidateParamters(type, z, x, y, jsonselector, begindate, enddate);
+            var (isValid, errorMessage) = ValidateParamters(type, z, x, y, jsonselector, operationmode, begindate, enddate, publishedon);
             if (!isValid)
                 return BadRequest(errorMessage);
 
-            var tile = await GetVectorTilesFromService(type, z, x, y, idlist, source, tagfilter, jsonselector, operationmode, displaytracksonzoomlevel, enableclustering, begindate, enddate);
+            if (!TryParseActive(active, out var activefilter))
+                return BadRequest("active must be true, false or null");
+
+            var tile = await GetVectorTilesFromService(type, z, x, y, idlist, source, tagfilter, jsonselector, operationmode, displaytracksonzoomlevel, enableclustering, begindate, enddate, activefilter, publishedon);
 
             if (tile == null || tile.Length == 0)
             {
@@ -164,7 +192,9 @@ public partial class VectorTilesController : ControllerBase
         int displaytracksonzoomlevel = 12,
         bool clusterpoints = true,
         DateTime? begindate = null,
-        DateTime? enddate = null
+        DateTime? enddate = null,
+        bool? active = true,
+        string? publishedon = null
     )
     {
         var (geometry_column, geometry_center_column) = TranslateTypeString2GeoColumns(type);
@@ -183,7 +213,28 @@ public partial class VectorTilesController : ControllerBase
             operationmode, 
             displaytracksonzoomlevel,
             begindate,
-            enddate);
+            enddate,
+            active,
+            publishedon);
+    }
+
+    /// <summary>
+    /// Parses the active parameter, "null" or empty means no filter on Active
+    /// </summary>
+    private static bool TryParseActive(string? active, out bool? result)
+    {
+        result = null;
+
+        if (string.IsNullOrWhiteSpace(active) || active.Trim().Equals("null", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (bool.TryParse(active.Trim(), out var parsed))
+        {
+            result = parsed;
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -201,8 +252,10 @@ public partial class VectorTilesController : ControllerBase
         int x,
         int y,
         string? jsonselector,
+        AllowedOperationMode operationmode,
         DateTime? begindate,
-        DateTime? enddate
+        DateTime? enddate,
+        string? publishedon
     )
     {
         // Validate tile coordinates
@@ -222,10 +275,28 @@ public partial class VectorTilesController : ControllerBase
         if (!SafeTypeRegex().IsMatch(type))
             return (false, "Invalid type");
 
-        TranslateTypeString2Table(type);
+        if (DeprecatedTypes.Contains(type))
+            return (false, $"type {type} is deprecated");
+
+        if (UnsupportedTypes.Contains(type))
+            return (false, $"type {type} is not supported");
+
+        string tableName;
+        try
+        {
+            tableName = TranslateTypeString2Table(type);
+        }
+        catch (Exception)
+        {
+            return (false, "Invalid type");
+        }
 
         // if (!String.IsNullOrEmpty(geocolumn) && !_allowedGeoColumns.Contains(geocolumn))
         //     return (false, "Invalid geo column");
+
+        var (geometrycolumn, geometrycentercolumn) = TranslateTypeString2GeoColumns(type);
+        if (!CheckOperationModeOnType(type, operationmode, geometrycolumn, geometrycentercolumn))
+            return (false, $"operationmode {operationmode} is not supported on type {type}, use points");
 
         // Full-value regex check — prevents prefix bypass (e.g. "Detail.x'--" starting with "Detail")
         if (!string.IsNullOrEmpty(jsonselector) &&
@@ -240,6 +311,10 @@ public partial class VectorTilesController : ControllerBase
 
         if (begindate != null && enddate != null && begindate > enddate)
             return (false, "begindate must be before enddate");
+
+        // PublishedOn filter relies on the gen_publishedon column, not available on all types
+        if (!string.IsNullOrWhiteSpace(publishedon) && !VectorTileService.TablesWithPublishedOn.Contains(tableName))
+            return (false, $"publishedon is not supported on type {type}");
 
         return (true, null);
     }
@@ -256,16 +331,12 @@ public partial class VectorTilesController : ControllerBase
         {
             "accommodation" => "accommodations",
             "accommodationroom" => "accommodationrooms",
-            "ltsactivity" => "activities",
-            "ltspoi" => "pois",
-            //"ltsgastronomy" => "gastronomies",
             "event" => "events",
             "odhactivitypoi" => "smgpois",
-            "package" => "packages",
             "measuringpoint" => "measuringpoints",
             "webcam" => "webcams",
             "article" => "articles",
-            "venue" => "venues_v2",
+            "venue" => "venues",
             "eventshort" => "eventeuracnoi",
             "experiencearea" => "experienceareas",
             "metaregion" => "metaregions",
@@ -276,8 +347,7 @@ public partial class VectorTilesController : ControllerBase
             "skiarea" => "skiareas",
             "skiregion" => "skiregions",
             "area" => "areas",
-            "wineaward" => "wines",
-            "odhtag" => "smgtags",
+            "wineaward" => "wines",            
             "publisher" => "publishers",
             "source" => "sources",
             "weatherhistory" => "weatherdatahistory",
@@ -287,7 +357,7 @@ public partial class VectorTilesController : ControllerBase
             "announcement" => "announcements",
             "urbangreen" => "urbangreens",
             "spatialdata" => "spatialdatas",
-            "timeseries" => "timeseries",
+            //"timeseries" => "timeseries",
             _ => throw new Exception("not known type"),
         };
     }
@@ -309,6 +379,7 @@ public partial class VectorTilesController : ControllerBase
 
     public static bool CheckOperationModeOnType(string type, AllowedOperationMode operationMode, string? geometrycolumn, string geometrycentercolumn)
     {
-        return true;
+        // Tracks need a geometry column, types without one only support points
+        return operationMode == AllowedOperationMode.points || geometrycolumn != null;
     }
 }

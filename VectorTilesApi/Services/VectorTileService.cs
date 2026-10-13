@@ -11,6 +11,23 @@ namespace OpenDataHubVectorTileApi.Services;
 
 public partial class VectorTileService : IVectorTileService
 {
+    // Tables having the generated column gen_active (bool)
+    public static readonly HashSet<string> TablesWithActive =
+    [
+        "accommodations", "accommodationrooms", "announcements", "areas", "articles", "districts",
+        "eventeuracnoi", "events", "experienceareas", "measuringpoints", "metaregions", "municipalities",
+        "regions", "skiareas", "skiregions", "smgpois", "spatialdatas", "tvs", "urbangreens",
+        "venues", "webcams", "wines"
+    ];
+
+    // Tables having the generated column gen_publishedon (text[])
+    public static readonly HashSet<string> TablesWithPublishedOn =
+    [
+        "accommodations", "accommodationrooms", "articles", "districts", "eventeuracnoi", "events",
+        "experienceareas", "measuringpoints", "metaregions", "municipalities", "regions",
+        "skiareas", "skiregions", "smgpois", "smgtags", "tags", "tvs", "venues", "webcams", "wines"
+    ];
+
     private readonly string _connectionString;    
     private readonly ILogger<VectorTileService> _logger;
 
@@ -42,7 +59,9 @@ public partial class VectorTileService : IVectorTileService
         AllowedOperationMode operationMode = AllowedOperationMode.points,
         int displayTracksonZoomLevel = 12,
         DateTime? begindate = null,
-        DateTime? enddate = null
+        DateTime? enddate = null,
+        bool? active = true,
+        string? publishedon = null
         )
     {
         try
@@ -74,6 +93,8 @@ public partial class VectorTileService : IVectorTileService
             var sourcequery = CreateSourceFilter(source, type, out var sourceparameters);
             var tagquery = CreateTagFilter(tagfilter, type, out var tagparameters);
             additionalwhereclause += CreateEventDateFilter(begindate, enddate, out var dateparameters);
+            additionalwhereclause += CreateActiveFilter(active, tableName, out var activeparameters);
+            additionalwhereclause += CreatePublishedOnFilter(publishedon, tableName, out var publishedonparameters);
 
             var (clusterpoints, showpoints, showtracks, showtracksatzoomlevel) = CheckOperationMode(operationMode, cluster, displayTracksonZoomLevel);
 
@@ -121,6 +142,14 @@ public partial class VectorTileService : IVectorTileService
             foreach (var dateparam in dateparameters)
             {
                 cmd.Parameters.AddWithValue(dateparam.Key, dateparam.Value);
+            }
+            foreach (var activeparam in activeparameters)
+            {
+                cmd.Parameters.AddWithValue(activeparam.Key, activeparam.Value);
+            }
+            foreach (var publishedonparam in publishedonparameters)
+            {
+                cmd.Parameters.AddWithValue(publishedonparam.Key, publishedonparam.Value);
             }
 
             _logger.LogInformation("SQL: {Sql} | Params: {Params}",
@@ -567,14 +596,14 @@ return $@"
             {
                 // Single source - use equality
                 parameters["type"] = tagarray[0];
-                return $" AND {tagarray} = @type";
+                return " AND type = @type";
             }
 
             // Multiple sources - use IN clause
             var paramNames = new List<string>();
             for (int i = 0; i < tagarray.Length; i++)
             {
-                var paramName = $"source{i}";
+                var paramName = $"tag{i}";
                 parameters[paramName] = tagarray[i];
                 paramNames.Add($"@{paramName}");
             }
@@ -594,6 +623,56 @@ return $@"
 
             return $" AND gen_tags && ARRAY[{string.Join(", ", paramNames)}]";
         }
+    }
+
+    /// <summary>
+    /// Filters by gen_active, only applied on tables having the gen_active column.
+    /// active null returns active and inactive records.
+    /// </summary>
+    private static string CreateActiveFilter(bool? active, string tableName, out Dictionary<string, object> parameters)
+    {
+        parameters = new Dictionary<string, object>();
+
+        if (active == null || !TablesWithActive.Contains(tableName))
+        {
+            return "";
+        }
+
+        parameters["active"] = active.Value;
+        return " AND gen_active = @active";
+    }
+
+    /// <summary>
+    /// Filters by gen_publishedon (text array). Comma-separated OR logic, records published on any of the given channels are returned.
+    /// </summary>
+    private static string CreatePublishedOnFilter(string? publishedon, string tableName, out Dictionary<string, object> parameters)
+    {
+        parameters = new Dictionary<string, object>();
+
+        if (string.IsNullOrWhiteSpace(publishedon) || !TablesWithPublishedOn.Contains(tableName))
+        {
+            return "";
+        }
+
+        var publishedonarray = publishedon.Split(',')
+                    .Select(s => s.Trim())
+                    .Where(s => !string.IsNullOrEmpty(s))
+                    .ToArray();
+
+        if (publishedonarray.Length == 0)
+        {
+            return "";
+        }
+
+        var paramNames = new List<string>();
+        for (int i = 0; i < publishedonarray.Length; i++)
+        {
+            var paramName = $"publishedon{i}";
+            parameters[paramName] = publishedonarray[i];
+            paramNames.Add($"@{paramName}");
+        }
+
+        return $" AND gen_publishedon && ARRAY[{string.Join(", ", paramNames)}]";
     }
 
     /// <summary>
