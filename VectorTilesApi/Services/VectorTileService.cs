@@ -590,58 +590,78 @@ return $@"
         return $" AND {columnName} IN ({string.Join(", ", paramNames)})";
     }
 
+    /// <summary>
+    /// Tagfilter, same syntax as the Open Data Hub Content Api:
+    /// "tag1,tag2" or "or(tag1,tag2)" matches any of the tags, "and(tag1,tag2)" matches all of them.
+    /// Combining and/or is not supported.
+    /// </summary>
     private static string CreateTagFilter(string tags, string type, out Dictionary<string, object> parameters)
     {
         parameters = new Dictionary<string, object>();
 
-        if (string.IsNullOrWhiteSpace(tags))
-        {
-            return "";
-        }
-
-        var tagarray = tags.Split(',')
-                    .Select(s => s.Trim())
-                    .Where(s => !string.IsNullOrEmpty(s))
-                    .ToArray();
+        var (matchall, tagarray) = ParseTagFilter(tags);
 
         if (tagarray.Length == 0)
         {
             return "";
         }
 
+        var paramNames = new List<string>();
+        for (int i = 0; i < tagarray.Length; i++)
+        {
+            var paramName = $"tag{i}";
+            parameters[paramName] = tagarray[i];
+            paramNames.Add($"@{paramName}");
+        }
+
         if (type == "geoshape")
         {
-            if (tagarray.Length == 1)
+            // geoshape has a single type column, and() requires every tag to equal it
+            if (tagarray.Length == 1 || matchall)
             {
-                // Single source - use equality
-                parameters["type"] = tagarray[0];
-                return " AND type = @type";
-            }
-
-            // Multiple sources - use IN clause
-            var paramNames = new List<string>();
-            for (int i = 0; i < tagarray.Length; i++)
-            {
-                var paramName = $"tag{i}";
-                parameters[paramName] = tagarray[i];
-                paramNames.Add($"@{paramName}");
+                return string.Concat(paramNames.Select(p => $" AND type = {p}"));
             }
 
             return $" AND type IN ({string.Join(", ", paramNames)})";
         }
-        else
-        {
-            // Multiple 
-            var paramNames = new List<string>();
-            for (int i = 0; i < tagarray.Length; i++)
-            {
-                var paramName = $"tag{i}";
-                parameters[paramName] = tagarray[i];
-                paramNames.Add($"@{paramName}");
-            }
 
-            return $" AND gen_tags && ARRAY[{string.Join(", ", paramNames)}]";
+        // @> gen_tags contains all tags, && gen_tags contains at least one of the tags
+        return $" AND gen_tags {(matchall ? "@>" : "&&")} ARRAY[{string.Join(", ", paramNames)}]";
+    }
+
+    /// <summary>
+    /// Parses "tag1,tag2", "or(tag1,tag2)" or "and(tag1,tag2)" into the conjunction and the tag list.
+    /// </summary>
+    public static (bool matchall, string[] tags) ParseTagFilter(string? tags)
+    {
+        if (string.IsNullOrWhiteSpace(tags))
+        {
+            return (false, Array.Empty<string>());
         }
+
+        var value = tags.Trim();
+        var matchall = false;
+
+        if (value.EndsWith(')'))
+        {
+            if (value.StartsWith("and(", StringComparison.OrdinalIgnoreCase))
+            {
+                matchall = true;
+                value = value[4..^1];
+            }
+            else if (value.StartsWith("or(", StringComparison.OrdinalIgnoreCase))
+            {
+                value = value[3..^1];
+            }
+        }
+
+        var tagarray = value.Split(',')
+                    .Select(s => s.Trim())
+                    .Where(s => !string.IsNullOrEmpty(s))
+                    .Distinct()
+                    .ToArray();
+
+        return (matchall, tagarray);
     }
 
     /// <summary>

@@ -48,7 +48,7 @@ public partial class VectorTilesController : ControllerBase
     /// <param name="y">Tile Y coordinate</param>
     /// <param name="idlist">Filter by a List of Ids</param>
     /// <param name="source">Source Filter</param>
-    /// <param name="tagfilter">Filter by Tags Separator "," see Open data hub Content Api tagfilter logic</param>
+    /// <param name="tagfilter">Filter by Tags, "tag1,tag2" or "or(tag1,tag2)" matches any tag, "and(tag1,tag2)" matches all tags (same syntax as the Open Data Hub Content Api)</param>
     /// <param name="jsonselector">Include More data (by standard Id and where possible a name is included in the Vector Tiles)</param>
     /// <param name="operationmode">points --> Display only points, tracks --> Display tracks only, --> pointsandtracks --> Display points and tracks (Default: points)</param>
     /// <param name="displaytracksonzoomlevel">zoom level when tracks are shown (default 12). Please use with caution service can be slow if zoom levels < 11 are used</param>
@@ -118,7 +118,7 @@ public partial class VectorTilesController : ControllerBase
     /// <param name="y">Tile Y coordinate</param>
     /// <param name="idlist">Filter by a List of Ids</param>
     /// <param name="source">Source Filter</param>
-    /// <param name="tagfilter">Filter by Tags Separator "," see Open data hub Content Api tagfilter logic</param>
+    /// <param name="tagfilter">Filter by Tags, "tag1,tag2" or "or(tag1,tag2)" matches any tag, "and(tag1,tag2)" matches all tags (same syntax as the Open Data Hub Content Api)</param>
     /// <param name="jsonselector">Include More data (by standard Id and where possible a name is included in the Vector Tiles)</param>
     /// <param name="operationmode">points --> Display only points, tracks --> Display tracks only, --> pointsandtracks --> Display points and tracks (Default: points)</param>
     /// <param name="displaytracksonzoomlevel">zoom level when tracks are shown (default 12). Please use with caution service can be slow if zoom levels < 11 are used</param>

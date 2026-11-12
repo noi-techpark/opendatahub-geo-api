@@ -122,7 +122,7 @@ Support for type (`timeseries`) currently disabled (wip)
 Optional Parameters
 - `idlist`: Separator "," pass Ids to filter on
 - `source`: Separator "," Filter by one or more sources
-- `tagfilter`: Separator "," see Open data hub Content Api tagfilter logic
+- `tagfilter`: `tag1,tag2` or `or(tag1,tag2)` matches any of the tags, `and(tag1,tag2)` matches all of them (same syntax as the Open Data Hub Content Api, combining and/or is not supported)
 - `jsonselector`: Include more data into the Vector Tiles (by standard Id and where possible a name is included)
 - `active`: Filter by active state `true`/`false`, `null` returns active and inactive (default `true`), ignored on types without Active field
 - `publishedon`: Separator "," Filter by publication channel (e.g. `idm-marketplace`), any of the channels matches
